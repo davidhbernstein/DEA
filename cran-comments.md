@@ -1,12 +1,25 @@
 ## Test environments
 
 * local macOS 26.5 (aarch64), R 4.5.2
-* GitHub Actions: macOS-latest (release), windows-latest (release),
-  ubuntu-latest (devel, release, oldrel-1)
+* GitHub Actions, all passing:
+  - macOS-latest, R release
+  - windows-latest, R release
+  - ubuntu-latest, R devel
+  - ubuntu-latest, R release
+  - ubuntu-latest, R oldrel-1
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note.
+
+The note is from CRAN's own incoming check and reads:
+
+    New submission
+    Package was archived on CRAN
+
+Both lines are expected: this is a first submission, and it deliberately
+reuses an archived name — see the next section. Everything else checks clean;
+there are no notes arising from the package itself.
 
 ## This submission reuses an archived package name
 
