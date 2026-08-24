@@ -1,0 +1,175 @@
+---
+title: "Getting started with DEA"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with DEA}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 4)
+library(DEA)
+```
+
+Data envelopment analysis estimates a production frontier as the smallest set
+containing the data that satisfies whichever axioms you are willing to assume,
+and measures each unit's distance to it. This vignette fits the four estimators
+in the package to one simulated data set and shows what each of them answers.
+
+## The data the model was introduced on
+
+The package bundles the Program Follow Through data of Charnes, Cooper and
+Rhodes (1981): 70 US primary school sites, five inputs describing family
+background and school resources, three outputs measuring reading, mathematics
+and self-esteem. This is the application the CCR model was published with.
+
+```{r}
+data(charnes1981)
+x <- charnes1981[, paste0("x", 1:5)]
+y <- charnes1981[, paste0("y", 1:3)]
+
+dea(x, y, rts = "crs", orientation = "in")
+```
+
+Nineteen of seventy sites score 1. Before reading anything into that, note the
+dimensions: five inputs and three outputs is a problem in eight dimensions, and
+a large efficient set is what eight dimensions produce whatever the data says.
+The last section of this vignette is about exactly that.
+
+## A technology with a known answer
+
+Real data cannot tell you whether an estimator is right, because the right
+answer is not known. `dea_sim()` draws from a technology whose distance
+functions have a closed form, so every estimate below can be scored against a
+truth that was written down before the estimator ran.
+
+```{r}
+sim <- dea_sim(n = 150, p = 2, q = 1, returns = 0.9, seed = 1)
+sim
+```
+
+`sim$theta` and `sim$phi` are the true input- and output-oriented Farrell
+efficiencies.
+
+## Radial efficiency
+
+```{r}
+fit <- dea(sim$x, sim$y, rts = "vrs", orientation = "in")
+fit
+```
+
+The score is the factor by which every input could be cut at unchanged output.
+`peers()` says which units span the piece of frontier each DMU is measured
+against, and `slacks()` says what is left over once the radial cut has been
+made.
+
+```{r}
+head(peers(fit), 4)
+head(slacks(fit), 4)
+```
+
+Those two are related. A DMU can be radially efficient — no *common* factor
+cuts every input — and still be dominated, because one input alone could come
+down. `print()` reports both counts when they differ, and `fit$efficient` is
+the stricter, Pareto–Koopmans judgement.
+
+## Slacks-based efficiency
+
+`dea_sbm()` folds that distinction into a single number: the average fraction
+of each input being wasted, against the average fraction of each output
+forgone. It equals 1 exactly on the Pareto–Koopmans efficient set.
+
+```{r}
+rho <- dea_sbm(sim$x, sim$y, rts = "vrs")
+c(radial = mean(fit$eff), sbm = mean(rho$eff))
+all(rho$eff <= fit$eff + 1e-8)
+```
+
+## Directional distance
+
+`dea_ddf()` moves inputs down and outputs up at the same time, along a
+direction you choose. It measures inefficiency additively, so 0 is on the
+frontier and larger is worse — and, unlike the two above, it does not divide by
+the DMU's own data, so zeros and negative values are fine.
+
+```{r}
+ddf <- dea_ddf(sim$x, sim$y, direction = "both", rts = "vrs")
+summary(ddf$beta)
+```
+
+The radial models are its two one-sided special cases:
+
+```{r}
+b_in <- dea_ddf(sim$x, sim$y, direction = "in", rts = "vrs")
+max(abs(b_in$beta - (1 - fit$eff)))
+```
+
+## Scale
+
+```{r}
+dea_rts(x, y, orientation = "out")
+```
+
+Scale efficiency is the part of the distance to the constant-returns frontier
+that comes from operating at the wrong *size* rather than from being badly run.
+Note that the classification depends on the orientation, and is meant to: it
+describes the frontier point a DMU is benchmarked against, and the two
+orientations project to different points.
+
+## The part most DEA analyses leave out
+
+Every score above is biased. The estimated frontier is spanned by the observed
+DMUs, so it lies inside the true one, and every efficiency estimate is pulled
+toward 1. The bias is not a rounding error:
+
+```{r}
+c(mean_estimate = mean(fit$eff), mean_truth = mean(sim$theta))
+```
+
+`dea_boot()` estimates that bias by resampling and returns a corrected estimate
+with a confidence interval.
+
+```{r}
+set.seed(1)
+b <- dea_boot(fit, B = 100, seed = 1, progress = FALSE)
+b
+```
+
+`B = 100` keeps this vignette quick; 2000 is the usual recommendation.
+
+The `correct_worthwhile` column applies Simar and Wilson's own warning: the
+correction removes a bias and adds the variance of the estimate of that bias,
+so it is a net loss where the bias is small relative to the noise. It is
+reported rather than applied silently.
+
+## How fast can any of this converge?
+
+Slowly, and more slowly with every variable you add. `dea_rate()` gives the
+slope that log mean squared error can attain against log sample size:
+
+```{r}
+c(`1 in, 1 out` = dea_rate(1, 1, "vrs"),
+  `2 in, 2 out` = dea_rate(2, 2, "vrs"),
+  `4 in, 4 out` = dea_rate(4, 4, "vrs"))
+```
+
+At four inputs and four outputs the slope is −4/9: a hundredfold increase in
+sample size buys about a factor of 8 in mean squared error, where a parametric
+estimator would buy 100. This is the strongest practical argument for keeping
+the number of variables small, and it is why the package warns when
+`n < 3(p+q)`.
+
+Which brings the Program Follow Through analysis back into view. Seventy units
+clears the `n >= 3(p+q)` rule comfortably — 70 against 24 — but the rule is
+about whether the scores mean anything at all, not about whether they are
+precise:
+
+```{r}
+dea_rate(5, 3, "crs")
+```
+
+A slope of −0.5 on eight dimensions. The 1981 analysis is still the right
+analysis of that data; it is simply an analysis whose efficient set is large
+because the space is large, and the nineteen sites scoring 1 should be read as
+"not dominated by any observed combination" rather than as "best practice".

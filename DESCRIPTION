@@ -1,0 +1,34 @@
+Package: DEA
+Version: 1.0.0
+Date: 2026-08-24
+Title: Data Envelopment Analysis
+Type: Package
+Authors@R: c(person("David", "Bernstein",
+                     email = "davebernstein1@gmail.com", role = c("aut", "cre"),
+                     comment = c(ORCID = "0000-0002-2267-5741")))
+Maintainer: David Bernstein <davebernstein1@gmail.com>
+Description: Nonparametric efficiency measurement by data envelopment analysis.
+    Provides radial (Charnes-Cooper-Rhodes and Banker-Charnes-Cooper) technical
+    efficiency under constant, variable, non-increasing and non-decreasing
+    returns to scale, the slacks-based measure of Tone (2001)
+    <doi:10.1016/S0377-2217(99)00407-5>, and the directional distance function
+    of Chambers, Chung and Fare (1996) <doi:10.1006/jeth.1996.0096>, all through
+    one interface and one result object.  Efficiency estimates are accompanied by
+    peers, slacks, returns-to-scale classification and scale efficiency, and by
+    bias-corrected estimates and confidence intervals from the smoothed
+    homogeneous bootstrap of Simar and Wilson (1998)
+    <doi:10.1287/mnsc.44.1.49>.
+Suggests: knitr, rmarkdown, testthat (>= 3.0.0), Benchmarking, DJL,
+    parallel, grDevices
+Imports: lpSolveAPI, stats, graphics, utils
+Depends: R (>= 4.0.0)
+License: GPL (>= 2)
+Language: en-US
+URL: https://www.davidharrybernstein.com/software,
+    https://github.com/davidhbernstein/DEA
+BugReports: https://github.com/davidhbernstein/DEA/issues
+LazyLoad: yes
+LazyData: true
+NeedsCompilation: no
+VignetteBuilder: knitr
+Config/testthat/edition: 3

@@ -1,0 +1,29 @@
+export(dea, dea_sbm, dea_ddf, dea_rts, dea_boot, dea_sim, dea_rate,
+       efficiency, peers, slacks)
+
+import("lpSolveAPI")
+
+## nobs() and fitted() are stats generics. Registering an S3 method for a
+## generic the namespace cannot see fails at LOAD time, not at call time, with
+## "object 'nobs' not found whilst loading namespace" -- so the package
+## installs cleanly and then refuses to load.
+importFrom("stats", "IQR", "bw.SJ", "bw.nrd0", "bw.ucv", "fitted",
+                    "model.matrix", "nobs", "quantile", "rexp", "rnorm",
+                    "runif", "sd", "terms")
+importFrom("graphics", "abline", "hist", "legend", "lines", "par")
+importFrom("utils", "flush.console", "head")
+
+S3method(print,   dea)
+S3method(summary, dea)
+S3method(plot,    dea)
+S3method(fitted,  dea)
+S3method(nobs,    dea)
+S3method(efficiency, dea)
+S3method(peers,      dea)
+S3method(slacks,     dea)
+
+S3method(print,   dea_rts)
+S3method(summary, dea_rts)
+S3method(print,   dea_boot)
+S3method(summary, dea_boot)
+S3method(print,   dea_sim)

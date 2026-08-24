@@ -1,0 +1,9 @@
+^cran-comments\.md$
+^\.DS_Store$
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.github$
+^README\.Rmd$
+^\.gitignore$
+^\.gitattributes$
+^revdep$

@@ -1,0 +1,17 @@
+# R
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user
+*.Rproj
+
+# build artefacts
+*.tar.gz
+*.Rcheck/
+inst/doc
+/doc/
+/Meta/
+..Rcheck/
+
+# macOS
+.DS_Store
