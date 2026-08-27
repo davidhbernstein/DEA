@@ -4,7 +4,7 @@
 \title{\packageTitle{DEA}}
 \description{\packageDescription{DEA}}
 \details{
-Four estimators, one interface and one result object:
+Five estimators, one interface and one result object:
 \describe{
   \item{\code{\link{dea}}}{radial Debreu-Farrell efficiency under constant,
   variable, non-increasing or non-decreasing returns, or free disposal, in
@@ -12,6 +12,8 @@ Four estimators, one interface and one result object:
   \item{\code{\link{dea_sbm}}}{the slacks-based measure of Tone (2001).}
   \item{\code{\link{dea_ddf}}}{the directional distance function of Chambers,
   Chung and Fare (1996), which handles zero and negative data.}
+  \item{\code{\link{dea_add}}}{the additive model of Charnes et al. (1985),
+  unweighted or as the Range Adjusted Measure.}
   \item{\code{\link{dea_rts}}}{scale efficiency and the returns-to-scale
   classification.}
 }

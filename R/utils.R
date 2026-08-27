@@ -15,6 +15,23 @@
 
 `%||%` <- function(a, b) if (is.null(a)) b else a
 
+## `data` is the THIRD positional argument of every entry point, so a call
+## meant as dea_add(x, y, "ram") quietly puts "ram" there and takes the default
+## measure instead -- returning a well-formed answer to a question nobody
+## asked. Nothing downstream notices, because a matrix `x` never consults
+## `data`. Refuse anything that could not possibly be a data source.
+.dea_check_data_arg <- function(data) {
+  if (is.null(data)) return(invisible(TRUE))
+  if (is.data.frame(data) || is.matrix(data) || is.list(data) ||
+      is.environment(data)) return(invisible(TRUE))
+  stop("`data` must be a data frame (or matrix/list), not ",
+       if (is.character(data)) paste0("the string \"", data[1], "\""),
+       if (!is.character(data)) paste0("a ", class(data)[1]),
+       ". If you meant to set another argument, name it -- `data` is the ",
+       "third positional argument of every entry point in this package.",
+       call. = FALSE)
+}
+
 ## Resolve an x/y argument into a numeric matrix with one row per DMU.
 ##
 ## Accepts a matrix, a data frame, a bare numeric vector (one variable), or --
@@ -180,4 +197,33 @@
          "; got \"", arg, "\".", call. = FALSE)
   }
   choices[hit]
+}
+
+## Report unsolved DMUs, distinguishing the two causes. lpSolve returns 2 for
+## an infeasible program and 5 for a numerical failure, and they call for
+## opposite responses: infeasibility is a statement about the data, numerical
+## failure is a statement about the conditioning of the program.
+.dea_report_unsolved <- function(status, n, self_ref, model) {
+  n_inf <- sum(status == 2L)
+  n_num <- sum(!status %in% c(0L, 1L, 2L))
+  if (n_inf > 0L) {
+    warning(n_inf, " of ", n, " DMU(s) gave an INFEASIBLE program and are ",
+            "reported as NA. ", model, " needs some convex combination of the ",
+            "reference DMUs to weakly dominate the evaluated point in every ",
+            "input and every output; a point outside the estimated technology ",
+            "has none. ",
+            if (!self_ref)
+              "That is expected when scoring against an external `xref`/`yref`; dea() has no such restriction."
+            else "On a self-referenced fit this is unusual -- check `status`.",
+            call. = FALSE)
+  }
+  if (n_num > 0L) {
+    warning(n_num, " of ", n, " DMU(s) FAILED NUMERICALLY (lpSolve status ",
+            paste(sort(unique(status[!status %in% c(0L, 1L, 2L)])), collapse = "/"),
+            ") and are reported as NA. This is a conditioning problem, not a ",
+            "statement about the data: it means the linear program could not ",
+            "be solved reliably at these magnitudes. Rescale the columns, or ",
+            "use a measure that normalizes them.", call. = FALSE)
+  }
+  invisible(NULL)
 }

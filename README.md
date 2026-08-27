@@ -6,7 +6,7 @@
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://cran.r-project.org/web/licenses/GPL-2)
 <!-- badges: end -->
 
-**Data envelopment analysis in R.** Four nonparametric efficiency estimators
+**Data envelopment analysis in R.** Five nonparametric efficiency estimators
 behind one interface and one result object, with the sampling theory that DEA
 practice usually leaves out: bias correction, confidence intervals, and an
 honest statement of how fast any of it can converge.
@@ -88,13 +88,14 @@ plot(fit)
 | `dea()` | radial Debreu–Farrell efficiency: CCR, BCC, non-increasing and non-decreasing returns, and the free disposal hull; either orientation; second-stage slacks; Andersen–Petersen super-efficiency |
 | `dea_sbm()` | the slacks-based measure of Tone (2001), non-oriented or oriented |
 | `dea_ddf()` | the directional distance function of Chambers, Chung and Färe (1996), which handles zero and negative data |
+| `dea_add()` | the additive model of Charnes et al. (1985), unweighted or as the Range Adjusted Measure |
 | `dea_rts()` | scale efficiency and the returns-to-scale classification |
 | `dea_boot()` | bias correction and confidence intervals, by the Simar–Wilson (1998) smoothed homogeneous bootstrap |
 | `dea_sim()` | a technology with a closed-form answer, for testing an estimator against a truth |
 | `dea_rate()` | the rate at which any of this can converge |
 | `charnes1981` | the Program Follow Through data the CCR model was introduced on |
 
-All three estimators return an object of class `"dea"`, so `print()`,
+All the estimators return an object of class `"dea"`, so `print()`,
 `summary()`, `plot()`, `efficiency()`, `peers()`, `slacks()` and `fitted()`
 work the same way across them.
 

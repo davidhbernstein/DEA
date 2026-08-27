@@ -161,6 +161,8 @@ dea <- function(x, y, data = NULL,
 ## ---------------------------------------------------------------------------
 .dea_data <- function(x, y, data, xref, yref, dataref, super, model,
                       require_positive = FALSE, allow_negative = FALSE) {
+  .dea_check_data_arg(data)
+  .dea_check_data_arg(dataref)
   X <- .dea_matrix(x, data, "x")
   Y <- .dea_matrix(y, data, "y")
   self <- is.null(xref) && is.null(yref)

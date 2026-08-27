@@ -85,19 +85,7 @@ dea_sbm <- function(x, y, data = NULL,
 
   ## Infeasibility here has one overwhelmingly likely cause, and saying so is
   ## more use than reporting a solver code.
-  n_inf <- sum(res$status == 2L)
-  if (n_inf > 0L) {
-    warning(n_inf, " of ", n, " DMU(s) gave an INFEASIBLE program and are ",
-            "reported as NA. The slacks-based measure needs some convex ",
-            "combination of the reference DMUs to weakly dominate the ",
-            "evaluated point in every input and every output; a point lying ",
-            "outside the estimated technology has no such combination. ",
-            if (!d$self)
-              "This is expected when scoring against an external `xref`/`yref`: use dea() instead, whose radial score falls below 1 for such a point rather than failing."
-            else
-              "Seeing this on a self-referenced fit is unusual and may indicate near-duplicate DMUs or severe scaling; check `status`.",
-            call. = FALSE)
-  }
+  .dea_report_unsolved(res$status, n, d$self, "The slacks-based measure")
 
   sx <- sweep(res$sx, 2L, sc$sx, "*")
   sy <- sweep(res$sy, 2L, sc$sy, "*")

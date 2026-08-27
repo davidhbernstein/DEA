@@ -1,4 +1,4 @@
-export(dea, dea_sbm, dea_ddf, dea_rts, dea_boot, dea_sim, dea_rate,
+export(dea, dea_sbm, dea_ddf, dea_add, dea_rts, dea_boot, dea_sim, dea_rate,
        efficiency, peers, slacks)
 
 import("lpSolveAPI")

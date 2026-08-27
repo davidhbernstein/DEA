@@ -14,7 +14,7 @@ entirely different:
 | `dea.ccr.io.env()`, `dea.ccr.oo.env()`, `dea.bcc.io.env()`, `dea.bcc.oo.env()` | `dea(rts = "crs" / "vrs", orientation = "in" / "out")` |
 | `dea.ccr.io.mul()`, `dea.bcc.oo.mul()`, ... | not exposed separately; the multiplier form is the dual of the same program |
 | `dea.sbm.ccr()`, `dea.sbm.bcc.io()`, ... | `dea_sbm(rts =, orientation =)` |
-| `dea.add.env()`, `dea.add.mul()` | no direct equivalent; see `dea_sbm()` |
+| `dea.add.env()`, `dea.add.mul()` | `dea_add(measure = "unweighted")`, plus the normalized RAM and MIP measures |
 
 Code written against 0.1-2 will not run. The version number starts at 1.0.0
 rather than 0.1.0 because 0.1.0 would rank *below* the archived 0.1-2 under R's
@@ -32,6 +32,13 @@ version ordering.
 * `dea_sbm()` — the slacks-based measure of Tone (2001), non-oriented,
   input-oriented or output-oriented. The non-oriented measure is a fractional
   program and is solved exactly by the Charnes-Cooper linearization.
+
+* `dea_add()` — the additive model of Charnes, Cooper, Golany, Seiford and
+  Stutz (1985), with three objective weightings: the Range Adjusted Measure of
+  Cooper, Park and Pastor (1999), the Measure of Inefficiency Proportions, and
+  the original unweighted total. One program on three scales; the projection
+  and the efficient set are identical across them, and that set is exactly the
+  Pareto-Koopmans set `dea()` and `dea_sbm()` find.
 
 * `dea_ddf()` — the directional distance function of Chambers, Chung and Fare
   (1996), with the direction given as one of five shorthands, a fixed vector,
@@ -82,6 +89,11 @@ version ordering.
 * `"drs"` and `"irs"` are accepted as aliases for `"nirs"` and `"ndrs"`, the
   spellings **Benchmarking** uses, so switching packages does not silently
   change the model.
+
+* A stray positional argument is refused rather than absorbed. `data` is the
+  third positional argument of every entry point, so `dea_add(x, y, "ram")`
+  used to put `"ram"` there and silently take the default measure. It now
+  errors.
 
 * Input and output columns are rescaled to mean one before solving. Radial
   efficiency, the slacks-based measure and a proportional-direction

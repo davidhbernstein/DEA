@@ -77,9 +77,13 @@ summary.dea <- function(object, ...) {
 }
 
 .dea_model_label <- function(x) switch(x$model,
-  radial = "radial (Debreu-Farrell)",
-  sbm    = "slacks-based measure (Tone 2001)",
-  ddf    = "directional distance (Chambers-Chung-Fare 1996)",
+  radial   = "radial (Debreu-Farrell)",
+  sbm      = "slacks-based measure (Tone 2001)",
+  ddf      = "directional distance (Chambers-Chung-Fare 1996)",
+  additive = paste0("additive (Charnes et al. 1985), ",
+                    switch(x$measure, ram = "range adjusted",
+                           mip = "inefficiency proportions",
+                           unweighted = "unweighted"), " measure"),
   x$model)
 
 .dea_measure_label <- function(x) switch(x$model,
@@ -87,6 +91,10 @@ summary.dea <- function(object, ...) {
            else "phi (output-oriented, 1 = on the frontier)",
   sbm    = "rho (1 = Pareto-Koopmans efficient)",
   ddf    = "beta (INEFFICIENCY: 0 = on the frontier, larger is worse)",
+  additive = if (identical(x$measure, "unweighted"))
+      "total slack (INEFFICIENCY: 0 = efficient; carries the units of the data)"
+    else if (identical(x$measure, "ram")) "rho_RAM (1 = Pareto-Koopmans efficient)"
+    else "rho_MIP (1 = Pareto-Koopmans efficient)",
   "efficiency")
 
 nobs.dea <- function(object, ...) object$n
@@ -111,6 +119,17 @@ efficiency.dea <- function(object, type = c("natural", "score"), ...) {
   switch(object$model,
     radial = if (object$orientation == "in") object$eff else 1 / object$eff,
     sbm    = object$eff,
+    additive = {
+      if (identical(object$measure, "unweighted")) {
+        stop("type = \"score\" is not defined for the unweighted additive ",
+             "model. Its objective adds slacks measured in different units, ",
+             "so it is a total in the data's own units rather than a ratio, ",
+             "and it is not even invariant to those units -- see ?dea_add. ",
+             "Use measure = \"ram\" or \"mip\", both of which normalize the ",
+             "slacks and return a score in [0, 1].", call. = FALSE)
+      }
+      object$eff
+    },
     ddf    = {
       if (identical(object$direction, "in"))  return(1 - object$eff)
       if (identical(object$direction, "out")) return(1 / (1 + object$eff))
@@ -172,6 +191,8 @@ fitted.dea <- function(object, ...) {
   if (identical(object$model, "ddf")) {
     px <- X - object$eff * object$g[, seq_len(object$p), drop = FALSE]
     py <- Y + object$eff * object$g[, object$p + seq_len(object$q), drop = FALSE]
+  } else if (identical(object$model, "additive")) {
+    px <- X - object$slack_x; py <- Y + object$slack_y
   } else if (identical(object$model, "radial")) {
     px <- if (object$orientation == "in") X * object$eff else X
     py <- if (object$orientation == "in") Y else Y * object$eff
