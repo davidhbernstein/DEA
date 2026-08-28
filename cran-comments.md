@@ -6,50 +6,44 @@ This is a resubmission of `DEA` 1.0.0, rejected on 2026-08-25 with:
 > If yes: Rejected as copyright and authors are not correctly cited.
 > If no: Rejected: Please choose a unique name.
 
-**The answer is yes**, and the citation has been corrected.
+**The answer is yes**, and the authorship has been corrected.
 
 `DEA` 0.1-2 was published in February 2008 by Zuleyka Diaz-Martinez and Jose
-Fernandez-Menendez and archived thereafter. This package is its successor: it
-covers the same models -- CCR, BCC, additive and slacks-based efficiency -- and
-takes over the name with the original authors' agreement. I contacted them and
-both have given permission to be added to the package. I can forward that
-correspondence on request.
+Fernandez-Menendez and archived thereafter. **Both are authors of this package.**
+I contacted them after the rejection, and they have joined the project rather
+than merely consenting to the name being reused; `Authors@R` now reads
 
-What has changed since the rejected version:
+    David Bernstein [aut, cre] (ORCID: 0000-0002-2267-5741)
+    Zuleyka Diaz-Martinez [aut]
+    Jose Fernandez-Menendez [aut]
 
-* **Both original authors are now listed as authors** in `Authors@R`, each with
-  a `comment` recording precisely what they authored:
+with no qualifying comment, because none is warranted: they are authors of this
+package on the same footing as I am, not merely of the one it succeeds. I can
+forward the correspondence on request.
 
-      Zuleyka Diaz-Martinez [aut] (author of the original DEA package (2008),
-        which this package succeeds)
-      Jose Fernandez-Menendez [aut] (author of the original DEA package (2008),
-        which this package succeeds)
+The rest of what has changed since the rejected version:
 
-* **The Description field states the relationship**, so a user arriving from
-  the archive is told what this is without having to open NEWS.
+* **The Description field states the succession**, so a user arriving from the
+  archive is told what this is without having to open NEWS.
 
 * **`NEWS.md` maps the old API onto the new one** function by function, and
   all sixteen entry points of 0.1-2 are now covered, envelopment and multiplier
   form alike. The multiplier form was the one genuine gap when 1.0.0 was first
   submitted: the score was there, since the two programs are duals and attain
-  the same value, but the optimal weights `v` and `u` that
-  `dea.ccr.io.mul()` and its siblings returned were not. `dea(..., multipliers
-  = TRUE)` and `multipliers()` now return them. The mapping was checked
-  against the archived tarball function by function, not from memory.
+  the same value, but the optimal weights `v` and `u` that `dea.ccr.io.mul()`
+  and its siblings returned were not. `dea(..., multipliers = TRUE)` and
+  `multipliers()` now return them. The mapping was checked against the archived
+  tarball function by function, not from memory.
 
 ### On copyright
 
 No copyright holder is declared beyond the authors, and deliberately so. **No
-code from 0.1-2 is included** -- not adapted, not translated, not referenced.
-The old package bundled a C implementation of the simplex method taken from
-GLPK; this one has no compiled code at all and solves through **lpSolveAPI**.
-The implementation is new throughout, so there is no third-party copyright to
-declare. The relationship is one of succession in name, subject and
-maintainership, not of derived code, and I would rather state that plainly than
-have it inferred.
-
-If you would prefer the original authors recorded as `ctb` rather than `aut`,
-or a `cph` entry added, I am happy to make either change.
+code from 0.1-2 is carried over** -- not adapted, not translated, not
+referenced. The 2008 package bundled a C implementation of the simplex method
+taken from GLPK; this one has no compiled code at all and solves through
+**lpSolveAPI**. The implementation is new throughout, so there is no
+third-party copyright to declare, and I would rather state that plainly than
+have it inferred from the shared authorship.
 
 ## Test environments
 

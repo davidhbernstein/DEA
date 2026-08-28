@@ -6,10 +6,8 @@ Type: Package
 Authors@R: c(person("David", "Bernstein",
                      email = "davebernstein1@gmail.com", role = c("aut", "cre"),
                      comment = c(ORCID = "0000-0002-2267-5741")),
-             person("Zuleyka", "Diaz-Martinez", role = "aut",
-                     comment = "author of the original DEA package (2008), which this package succeeds"),
-             person("Jose", "Fernandez-Menendez", role = "aut",
-                     comment = "author of the original DEA package (2008), which this package succeeds"))
+             person("Zuleyka", "Diaz-Martinez", role = "aut"),
+             person("Jose", "Fernandez-Menendez", role = "aut"))
 Maintainer: David Bernstein <davebernstein1@gmail.com>
 Description: Nonparametric efficiency measurement by data envelopment analysis.
     Provides radial (Charnes-Cooper-Rhodes and Banker-Charnes-Cooper) technical
@@ -25,9 +23,7 @@ Description: Nonparametric efficiency measurement by data envelopment analysis.
     the technical component from the allocative one; where they are not,
     cross-efficiency with the secondary goals of Doyle and Green (1994) ranks
     units that a self-appraisal leaves tied.  This package succeeds the
-    archived 'DEA' package of Diaz-Martinez and Fernandez-Menendez (2008),
-    with their permission; it covers the same models but shares no code
-    with it.
+    archived 'DEA' package of Diaz-Martinez and Fernandez-Menendez (2008).
 Suggests: knitr, rmarkdown, testthat (>= 3.0.0), Benchmarking, DJL,
     parallel, grDevices
 Imports: lpSolveAPI, stats, graphics, utils

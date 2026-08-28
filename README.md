@@ -13,16 +13,15 @@ sampling theory that DEA practice usually leaves out: bias correction,
 confidence intervals, and an honest statement of how fast any of it can
 converge.
 
-Written by David H. Bernstein, succeeding the original `DEA` package of
-Zuleyka Díaz-Martínez and José Fernández-Menéndez. A companion to
-[`sfa`](https://github.com/davidhbernstein/sfa), which does the parametric half
-of the same problem.
+By David H. Bernstein, Zuleyka Díaz-Martínez and José Fernández-Menéndez.
+A companion to [`sfa`](https://github.com/davidhbernstein/sfa), which does the
+parametric half of the same problem.
 
 > **On the name.** This package succeeds `DEA` 0.1-2, published in 2008 by
 > Zuleyka Díaz-Martínez and José Fernández-Menéndez and archived shortly
-> afterwards. The name is taken over with their permission and both are
-> credited as authors. It covers the same models, but shares no code — the
-> implementation is new throughout and the API is entirely different. See
+> afterwards; both are authors here. It covers the same models, but no code is
+> carried over — the 2008 package bundled a GLPK simplex in C, this one has no
+> compiled code at all, and the API is entirely different. See
 > [`NEWS.md`](NEWS.md) for a table mapping the old function names onto the new
 > arguments.
 

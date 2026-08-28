@@ -3,12 +3,14 @@
 First release.
 
 **This package succeeds `DEA` 0.1-2**, published in 2008 by Zuleyka
-Diaz-Martinez and Jose Fernandez-Menendez and archived shortly afterwards. The
-name is taken over with their permission, and both are credited as authors.
+Diaz-Martinez and Jose Fernandez-Menendez and archived shortly afterwards. Both
+are authors of this package.
 
 The two cover the same ground — the 2008 package had CCR, BCC, additive and
 slacks-based models in envelopment and multiplier form — but **no code is
-shared**. The implementation here is new throughout, and the API is entirely
+carried over**. The 2008 package bundled a C implementation of the simplex
+method from GLPK; this one has no compiled code at all and solves through
+**lpSolveAPI**. The implementation is new throughout and the API is entirely
 different:
 
 | `DEA` 0.1-2 | here |
