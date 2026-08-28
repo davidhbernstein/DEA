@@ -5,6 +5,9 @@
 \alias{peers.dea}
 \alias{slacks}
 \alias{slacks.dea}
+\alias{multipliers}
+\alias{multipliers.dea}
+\alias{multipliers.dea_cross}
 \alias{print.dea}
 \alias{summary.dea}
 \alias{plot.dea}
@@ -26,6 +29,10 @@ peers(object, \dots)
 slacks(object, \dots)
 \method{slacks}{dea}(object, \dots)
 
+multipliers(object, \dots)
+\method{multipliers}{dea}(object, \dots)
+\method{multipliers}{dea_cross}(object, \dots)
+
 \method{print}{dea}(x, \dots)
 \method{summary}{dea}(object, \dots)
 \method{plot}{dea}(x, ngrid = 400, \dots)
@@ -33,7 +40,8 @@ slacks(object, \dots)
 \method{nobs}{dea}(object, \dots)
 }
 \arguments{
-\item{object, x}{An object of class \code{"dea"}.}
+\item{object, x}{An object of class \code{"dea"}, or -- for
+\code{multipliers()} -- one of class \code{"dea_cross"}.}
 \item{type}{\code{"natural"} returns the model's own measure --- \eqn{\theta},
 \eqn{\phi}, \eqn{\rho} or \eqn{\beta}. \code{"score"} maps all of them onto
 \eqn{(0, 1]} with 1 meaning efficient, which is what a table comparing models
@@ -73,6 +81,21 @@ multiple optima, so \code{peers()} reports one valid benchmark set rather than
 the benchmark set. Efficiency scores are unique; the weights achieving them
 generally are not.
 }
+\section{The multiplier form}{
+\code{multipliers()} returns one row per DMU: the weights \eqn{v} on the
+inputs, \eqn{u} on the outputs, and \eqn{u_0} where the technology has one.
+They are the prices that make the DMU look as good as it possibly can while
+valuing no reference DMU above break-even, and they satisfy \eqn{v'x_o = 1}
+(input orientation) in the caller's own units.
+
+\strong{For an efficient DMU they are not unique.} An efficient unit generally
+has a whole face of optimal weight vectors, every one giving it the same score
+of 1 and giving other DMUs different ones, so what comes back is one vertex of
+that face and another solver may return a different vertex. The score is
+unique; the prices supporting it are not. \code{\link{dea_cross}} exists
+largely to deal with the consequences.
+}
+
 \seealso{\code{\link{dea}}, \code{\link{dea_sbm}}, \code{\link{dea_ddf}}}
 \examples{
 sim <- dea_sim(60, p = 1, q = 1, seed = 1)

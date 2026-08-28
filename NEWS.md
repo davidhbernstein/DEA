@@ -2,23 +2,55 @@
 
 First release.
 
-**This package shares only its name with `DEA` 0.1-2**, which was published in
-2008 by Zuleyka Diaz-Martinez and Jose Fernandez-Menendez and archived shortly
-afterwards. The name has been reused; no code has. The two cover much the same
-ground — the 2008 package had CCR, BCC, additive and slacks-based models in
-both envelopment and multiplier form — but nothing carries over, and the API is
-entirely different:
+**This package succeeds `DEA` 0.1-2**, published in 2008 by Zuleyka
+Diaz-Martinez and Jose Fernandez-Menendez and archived shortly afterwards. The
+name is taken over with their permission, and both are credited as authors.
+
+The two cover the same ground — the 2008 package had CCR, BCC, additive and
+slacks-based models in envelopment and multiplier form — but **no code is
+shared**. The implementation here is new throughout, and the API is entirely
+different:
 
 | `DEA` 0.1-2 | here |
 |---|---|
 | `dea.ccr.io.env()`, `dea.ccr.oo.env()`, `dea.bcc.io.env()`, `dea.bcc.oo.env()` | `dea(rts = "crs" / "vrs", orientation = "in" / "out")` |
-| `dea.ccr.io.mul()`, `dea.bcc.oo.mul()`, ... | not exposed separately; the multiplier form is the dual of the same program |
-| `dea.sbm.ccr()`, `dea.sbm.bcc.io()`, ... | `dea_sbm(rts =, orientation =)` |
-| `dea.add.env()`, `dea.add.mul()` | `dea_add(measure = "unweighted")`, plus the normalized RAM and MIP measures |
+| `dea.ccr.io.mul()`, `dea.ccr.oo.mul()`, `dea.bcc.io.mul()`, `dea.bcc.oo.mul()` | `dea(..., multipliers = TRUE)`, then `multipliers(fit)` for `v` and `u` |
+| `dea.sbm.ccr()`, `dea.sbm.ccr.io()`, `dea.sbm.ccr.oo()`, `dea.sbm.bcc()`, `dea.sbm.bcc.io()`, `dea.sbm.bcc.oo()` | `dea_sbm(rts = "crs" / "vrs", orientation = "none" / "in" / "out")` |
+| `dea.add.env()` | `dea_add(measure = "unweighted")`, plus the normalized RAM and MIP measures |
+| `dea.add.mul()` | `dea_add()` for the slacks; `dea(..., multipliers = TRUE)` for the supporting weights |
 
-Code written against 0.1-2 will not run. The version number starts at 1.0.0
-rather than 0.1.0 because 0.1.0 would rank *below* the archived 0.1-2 under R's
-version ordering.
+All sixteen entry points of 0.1-2 are covered, envelopment and multiplier form
+alike. Code written against them will not run: the names, the arguments and the
+return values are all different. The version number starts at 1.0.0 rather than
+0.1.0 because 0.1.0 would rank *below* the archived 0.1-2 under R's version
+ordering.
+
+## Prices, and weights
+
+* `dea(..., multipliers = TRUE)` solves the **multiplier (dual) program** at
+  each DMU and returns the optimal weights `v` on the inputs, `u` on the
+  outputs and the returns-to-scale intercept `u0`, in the caller's own units.
+  `multipliers(fit)` puts them in one matrix. For an *efficient* DMU these are
+  not unique -- there is a whole face of optimal weight vectors -- and the
+  documentation says so rather than leaving it to be discovered.
+
+* `dea_cost()` and `dea_revenue()` -- cost and revenue efficiency, each
+  factoring **exactly** into technical times allocative, so a DMU that sits on
+  the frontier while buying the wrong mix for its prices is visible as such.
+
+* `dea_profit()` -- Nerlovian profit inefficiency, the profit gap normalized by
+  the value of a direction. It *adds* into technical plus allocative rather
+  than multiplying, because observed profit is routinely zero or negative and a
+  ratio is undefined exactly where the question matters. Constant and
+  non-decreasing returns are refused: maximum profit over a cone is unbounded
+  as soon as one reference DMU is profitable.
+
+* `dea_cross()` -- cross-efficiency, with the Doyle and Green (1994)
+  benevolent and aggressive secondary goals. Plain cross-efficiency depends on
+  which vertex of an optimal face the solver stopped at, and the spread is
+  first-order rather than numerical; running both goals brackets it. On
+  `charnes1981` the constant-returns model calls 19 of 70 sites efficient and
+  cannot rank them, and cross-efficiency ranks all 70 with no ties.
 
 ## Estimators
 

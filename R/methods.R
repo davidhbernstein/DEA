@@ -152,20 +152,7 @@ peers <- function(object, ...) UseMethod("peers")
 ## to an internal object cannot be documented without a codoc mismatch, and a
 ## user reading args(peers.dea) should see the number.
 peers.dea <- function(object, threshold = 1e-8, ...) {
-  if (is.null(object$lambda)) {
-    stop("This fit was made with peers = FALSE, so the lambda matrix was not ",
-         "kept. Refit with peers = TRUE.", call. = FALSE)
-  }
-  idx <- which(object$lambda > threshold, arr.ind = TRUE)
-  if (!nrow(idx)) {
-    return(data.frame(dmu = character(0), peer = character(0),
-                      lambda = numeric(0), stringsAsFactors = FALSE))
-  }
-  idx <- idx[order(idx[, 1L], -object$lambda[idx]), , drop = FALSE]
-  data.frame(dmu    = object$dmu[idx[, 1L]],
-             peer   = object$dmu[idx[, 2L]],
-             lambda = object$lambda[idx],
-             row.names = NULL, stringsAsFactors = FALSE)
+  .dea_peer_table(object$lambda, object$dmu, object$ref, threshold, "dea()")
 }
 
 slacks <- function(object, ...) UseMethod("slacks")
@@ -258,4 +245,237 @@ plot.dea <- function(x, ngrid = 400, ...) {
   graphics::abline(v = if (identical(x$model, "ddf")) 0 else 1,
                    lwd = 2, col = "steelblue")
   invisible(e)
+}
+## ---------------------------------------------------------------------------
+## Extractors and methods for the multiplier form, the price models and
+## cross-efficiency.
+## ---------------------------------------------------------------------------
+
+## multipliers(): the weights v, u and the intercept u0, as one matrix.
+##
+## Kept as an extractor rather than three fields so that the ONE fact a reader
+## most needs about them travels with the object: for an efficient DMU the
+## optimal weights are generally not unique, so what comes back is one vertex
+## of an optimal face and another solver may hand back a different one. The
+## score is unique; the prices that support it are not.
+multipliers <- function(object, ...) UseMethod("multipliers")
+
+multipliers.dea <- function(object, ...) {
+  if (is.null(object$v)) {
+    stop("This fit carries no multipliers. Refit with multipliers = TRUE. ",
+         "(They are off by default because the multiplier form is a second ",
+         "linear program per DMU, and most callers want the score.)",
+         call. = FALSE)
+  }
+  out <- cbind(object$v, object$u)
+  colnames(out) <- c(paste0("v_", colnames(object$v)),
+                     paste0("u_", colnames(object$u)))
+  if (!is.null(object$u0)) out <- cbind(out, u0 = object$u0)
+  out
+}
+
+multipliers.dea_cross <- function(object, ...) {
+  out <- cbind(object$v, object$u)
+  colnames(out) <- c(paste0("v_", colnames(object$x)),
+                     paste0("u_", colnames(object$y)))
+  if (!is.null(object$u0)) out <- cbind(out, u0 = object$u0)
+  rownames(out) <- object$ref
+  out
+}
+
+## ---------------------------------------------------------------------------
+## Price models.
+## ---------------------------------------------------------------------------
+
+print.dea_price <- function(x, ...) {
+  lab <- switch(x$model,
+    cost    = "Cost efficiency",
+    revenue = "Revenue efficiency",
+    profit  = "Profit efficiency (Nerlovian)")
+  cat("--- ", lab, " ---\n", sep = "")
+  cat("technology:  ", toupper(x$rts), "\n", sep = "")
+  cat("DMUs: ", x$n, "   inputs: ", x$p, "   outputs: ", x$q,
+      "   (", format(round(x$total_time, 3)), " sec)\n", sep = "")
+  if (!isTRUE(x$self_ref)) {
+    cat("scored against an EXTERNAL reference set of ", x$nref, " DMUs\n", sep = "")
+  }
+
+  if (identical(x$model, "profit")) {
+    cat("\nnormalized profit gap (0 = profit maximizing, LARGER IS WORSE)\n")
+    print(round(summary(x$eff[is.finite(x$eff)]), 4))
+    cat("\n  = technical (directional distance, g = \"", x$direction[1L],
+        "\")  +  allocative\n", sep = "")
+    tb <- rbind(technical = summary(x$technical[is.finite(x$technical)]),
+                allocative = summary(x$allocative[is.finite(x$allocative)]))
+    print(round(tb, 4))
+    cat("\nprofit maximizing DMUs: ",
+        sum(x$eff <= .DEA_CONSTANTS$TOL_EFF, na.rm = TRUE), " of ", x$n, "\n",
+        sep = "")
+  } else {
+    cat("\n", x$model, " efficiency (1 = best)\n", sep = "")
+    print(round(summary(x$eff[is.finite(x$eff)]), 4))
+    cat("\n  = technical  x  allocative\n")
+    tb <- rbind(technical = summary(x$technical[is.finite(x$technical)]),
+                allocative = summary(x$allocative[is.finite(x$allocative)]))
+    print(round(tb, 4))
+    cat("\nfully ", x$model, " efficient: ", sum(x$eff == 1, na.rm = TRUE),
+        " of ", x$n, sep = "")
+    ## The whole reason for the decomposition, in one line: a DMU can be on the
+    ## frontier and still be buying the wrong mix.
+    onfront <- sum(x$technical >= 1 - .DEA_CONSTANTS$TOL_EFF, na.rm = TRUE)
+    if (onfront > sum(x$eff == 1, na.rm = TRUE)) {
+      cat("  (", onfront, " are technically efficient, of which ",
+          onfront - sum(x$eff == 1, na.rm = TRUE),
+          " use the wrong mix for their prices)", sep = "")
+    }
+    cat("\n")
+  }
+  bad <- sum(!is.finite(x$eff))
+  if (bad) cat("NOT SOLVED: ", bad, " DMU(s); see $status.\n", sep = "")
+  invisible(x)
+}
+
+summary.dea_price <- function(object, ...) {
+  print(object)
+  n <- object$n
+  cat("\nby DMU (first ", min(10L, n), " of ", n, ")\n", sep = "")
+  tb <- if (identical(object$model, "profit")) {
+    data.frame(dmu = object$dmu,
+               observed = round(object$profit_obs, 4),
+               maximum  = round(object$profit_max, 4),
+               nerlovian = round(object$eff, 4),
+               technical = round(object$technical, 4),
+               allocative = round(object$allocative, 4),
+               row.names = NULL, stringsAsFactors = FALSE)
+  } else {
+    data.frame(dmu = object$dmu,
+               observed = round(object$observed, 4),
+               optimal  = round(object$optimal, 4),
+               overall  = round(object$eff, 4),
+               technical = round(object$technical, 4),
+               allocative = round(object$allocative, 4),
+               row.names = NULL, stringsAsFactors = FALSE)
+  }
+  print(utils::head(tb, 10))
+  invisible(object)
+}
+
+efficiency.dea_price <- function(object,
+                                 type = c("natural", "overall", "technical",
+                                          "allocative"), ...) {
+  type <- .match_arg_ci(type, c("natural", "overall", "technical",
+                                "allocative"), "type")
+  switch(type,
+    natural    = object$eff,
+    overall    = object$eff,
+    technical  = object$technical,
+    allocative = object$allocative)
+}
+
+nobs.dea_price <- function(object, ...) object$n
+
+## The cost- or revenue-optimal quantities: the input mix a DMU would buy, or
+## the output mix it would sell, at its own prices.  Not defined for the profit
+## model, whose optimum is a point in both spaces at once and is read off the
+## peers instead.
+fitted.dea_price <- function(object, ...) {
+  if (identical(object$model, "profit")) {
+    stop("fitted() is not defined for a profit fit: the profit-maximizing ",
+         "point moves inputs AND outputs, so there is no single side to ",
+         "return. Use peers() for the DMU(s) that attain it, or ",
+         "fitted(dea_ddf(...)) for the projection in the direction g.",
+         call. = FALSE)
+  }
+  object$optimal_q
+}
+
+peers.dea_price <- function(object, threshold = 1e-8, ...) {
+  .dea_peer_table(object$lambda, object$dmu, object$ref, threshold,
+                  "dea_cost()/dea_revenue()/dea_profit()")
+}
+
+## ---------------------------------------------------------------------------
+## Cross-efficiency.
+## ---------------------------------------------------------------------------
+
+print.dea_cross <- function(x, ...) {
+  cat("--- Cross-efficiency ---\n")
+  cat("technology:  ", toupper(x$rts), ", input oriented\n", sep = "")
+  cat("secondary goal: ", x$secondary,
+      if (identical(x$secondary, "none"))
+        "  <- ARBITRARY among alternate optima; see ?dea_cross" else "",
+      "\n", sep = "")
+  cat("DMUs: ", x$n, "   raters: ", x$nref, "   (",
+      format(round(x$total_time, 3)), " sec)\n", sep = "")
+  if (!x$self && isTRUE(x$self_ref)) cat("self-appraisal excluded\n")
+
+  cat("\ncross-efficiency (mean appraisal by every rater)\n")
+  print(round(summary(x$eff[is.finite(x$eff)]), 4))
+  if (!is.null(x$own)) {
+    cat("\nown DEA score, for comparison\n")
+    print(round(summary(x$own[is.finite(x$own)]), 4))
+    cat("\nDMUs scoring 1 on their own weights: ",
+        sum(x$own >= 1 - .DEA_CONSTANTS$TOL_EFF, na.rm = TRUE), " of ", x$n,
+        ";  ties in the cross ranking: ",
+        x$n - length(unique(round(x$eff, 8))), "\n", sep = "")
+  }
+  invisible(x)
+}
+
+summary.dea_cross <- function(object, ...) {
+  print(object)
+  n <- object$n
+  ord <- order(object$eff, decreasing = TRUE)
+  cat("\nranked by cross-efficiency (first ", min(10L, n), " of ", n, ")\n",
+      sep = "")
+  tb <- data.frame(rank = seq_len(n), dmu = object$dmu[ord],
+                   cross = round(object$eff[ord], 4),
+                   row.names = NULL, stringsAsFactors = FALSE)
+  if (!is.null(object$own))      tb$own <- round(object$own[ord], 4)
+  if (!is.null(object$maverick)) tb$maverick <- round(object$maverick[ord], 4)
+  tb$spread <- round(object$spread[ord], 4)
+  print(utils::head(tb, 10))
+  invisible(object)
+}
+
+efficiency.dea_cross <- function(object,
+                                 type = c("natural", "cross", "own",
+                                          "maverick"), ...) {
+  type <- .match_arg_ci(type, c("natural", "cross", "own", "maverick"), "type")
+  switch(type,
+    natural  = object$eff,
+    cross    = object$eff,
+    own      = .cross_needs_self(object$own, "own DEA score"),
+    maverick = .cross_needs_self(object$maverick, "maverick index"))
+}
+
+.cross_needs_self <- function(z, what) {
+  if (is.null(z)) {
+    stop("The ", what, " needs each rated DMU to be one of the raters, and ",
+         "this fit used an external `xref`/`yref`. Score the DMUs against ",
+         "themselves to get it.", call. = FALSE)
+  }
+  z
+}
+
+nobs.dea_cross <- function(object, ...) object$n
+
+## ---------------------------------------------------------------------------
+## Shared by every peers() method: one row per (DMU, peer) pair.
+## ---------------------------------------------------------------------------
+.dea_peer_table <- function(L, dmu, ref, threshold, who) {
+  if (is.null(L)) {
+    stop("This fit was made with peers = FALSE, so the lambda matrix was not ",
+         "kept. Refit ", who, " with peers = TRUE.", call. = FALSE)
+  }
+  idx <- which(L > threshold, arr.ind = TRUE)
+  if (!nrow(idx)) {
+    return(data.frame(dmu = character(0), peer = character(0),
+                      lambda = numeric(0), stringsAsFactors = FALSE))
+  }
+  idx <- idx[order(idx[, 1L], -L[idx]), , drop = FALSE]
+  data.frame(dmu    = dmu[idx[, 1L]],
+             peer   = ref[idx[, 2L]],
+             lambda = L[idx],
+             row.names = NULL, stringsAsFactors = FALSE)
 }

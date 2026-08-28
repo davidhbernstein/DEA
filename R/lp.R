@@ -214,3 +214,134 @@
   for (k in seq_len(ncol(M))) ok <- ok & (M[, k] <= v[k] + 1e-12)
   ok
 }
+
+## ---------------------------------------------------------------------------
+## The MULTIPLIER (dual) programs.
+##
+## Every radial score above can be read off either of two programs.  The
+## envelopment form asks "what combination of the other DMUs dominates this
+## one"; the multiplier form asks "what set of prices would make this DMU look
+## as good as possible".  Strong duality makes them attain the same value, so
+## the score alone gives no reason to solve both -- but the multiplier form
+## returns something the envelopment form does not: the weights themselves,
+## v on the inputs and u on the outputs, which are what the DMU would have to
+## believe about relative worth to justify its own score.
+##
+## Input orientation, at DMU o:
+##
+##   max  u'y_o - u0
+##   s.t. v'x_o = 1
+##        u'Y_j - v'X_j - u0 <= 0      for every reference DMU j
+##        u >= 0, v >= 0
+##
+## Output orientation:
+##
+##   min  v'x_o - v0
+##   s.t. u'y_o = 1
+##        v'X_j - u'Y_j - v0 >= 0
+##
+## THE SIGN ON u0 IS THE WHOLE RETURNS-TO-SCALE ASSUMPTION, and it is not
+## symmetric between the two orientations.  Under the convention above --
+## u0 entering the objective and the constraints with the same MINUS sign --
+##
+##            input oriented      output oriented
+##   crs      no u0               no u0
+##   vrs      free                free
+##   nirs     u0 >= 0             u0 <= 0
+##   ndrs     u0 <= 0             u0 >= 0
+##
+## Getting one of these backwards does not error: it solves a different
+## technology's program and returns a plausible number.  The table was fixed by
+## checking the optimal value against the envelopment program on samples where
+## the restriction actually binds (nirs and ndrs scores that differ from the
+## vrs ones), because on data where it does not bind every sign convention
+## agrees and the check proves nothing.  test-multipliers.R keeps that.
+##
+## As above, the matrix is built once: the constraint rows are the reference
+## technology and never move.  Only row 1 (which holds the evaluated DMU) and
+## the objective change from DMU to DMU.
+## ---------------------------------------------------------------------------
+
+## u0's bounds, given the technology and the orientation.  NULL means the model
+## has no u0 at all.
+.mult_u0_bounds <- function(rts, orientation) {
+  if (identical(rts, "crs")) return(NULL)
+  if (identical(rts, "vrs")) return(c(-.LP_INF, .LP_INF))
+  nonneg <- c(0, .LP_INF)
+  nonpos <- c(-.LP_INF, 0)
+  switch(rts,
+    nirs = if (orientation == "in") nonneg else nonpos,
+    ndrs = if (orientation == "in") nonpos else nonneg,
+    stop("rts = \"", rts, "\" has no multiplier form here.", call. = FALSE))
+}
+
+.lp_mult_build <- function(XR, YR, rts, orientation) {
+  nr <- nrow(XR); p <- ncol(XR); q <- ncol(YR)
+  b0 <- .mult_u0_bounds(rts, orientation)
+  has0 <- !is.null(b0)
+  nv <- p + q + has0
+  lp <- lpSolveAPI::make.lp(1L + nr, nv)
+  lpSolveAPI::lp.control(lp, sense = if (orientation == "in") "max" else "min",
+                         epsel = .DEA_CONSTANTS$LP_EPSEL, verbose = "neutral")
+
+  ## Row 1 is the normalization and is rewritten per DMU; rows 2..(nr+1) are
+  ## the reference technology and are written once, here.
+  if (orientation == "in") {
+    for (i in seq_len(p)) lpSolveAPI::set.column(lp, i,      c(0, -XR[, i]))
+    for (r in seq_len(q)) lpSolveAPI::set.column(lp, p + r,  c(0,  YR[, r]))
+    if (has0) lpSolveAPI::set.column(lp, nv, c(0, rep(-1, nr)))
+    lpSolveAPI::set.constr.type(lp, c("=", rep("<=", nr)))
+  } else {
+    for (i in seq_len(p)) lpSolveAPI::set.column(lp, i,      c(0,  XR[, i]))
+    for (r in seq_len(q)) lpSolveAPI::set.column(lp, p + r,  c(0, -YR[, r]))
+    if (has0) lpSolveAPI::set.column(lp, nv, c(0, rep(-1, nr)))
+    lpSolveAPI::set.constr.type(lp, c("=", rep(">=", nr)))
+  }
+  lpSolveAPI::set.rhs(lp, c(1, rep(0, nr)))
+  if (has0) {
+    lpSolveAPI::set.bounds(lp, lower = b0[1L], upper = b0[2L], columns = nv)
+  }
+  list(lp = lp, nref = nr, p = p, q = q, nv = nv, has0 = has0,
+       rts = rts, orientation = orientation)
+}
+
+.lp_mult_at <- function(M, X, Y, o, exclude = NULL) {
+  lp <- M$lp; p <- M$p; q <- M$q; nv <- M$nv
+  ## The full row, not a sparse update: set.row with an index vector zeroes the
+  ## entries it is not given, and writing the whole thing is both cheaper to
+  ## reason about and no slower at these widths.
+  row1 <- numeric(nv)
+  if (M$orientation == "in") {
+    row1[seq_len(p)] <- X[o, ]
+    obj <- c(rep(0, p), Y[o, ], if (M$has0) -1 else NULL)
+  } else {
+    row1[p + seq_len(q)] <- Y[o, ]
+    obj <- c(X[o, ], rep(0, q), if (M$has0) -1 else NULL)
+  }
+  lpSolveAPI::set.row(lp, 1L, row1)
+  lpSolveAPI::set.objfn(lp, obj)
+
+  ## Super-efficiency drops DMU o from its own reference set. In the
+  ## envelopment form that is a bound on a column; here it is the CONSTRAINT
+  ## contributed by o, relaxed by pushing its right-hand side out of reach.
+  if (!is.null(exclude)) {
+    lpSolveAPI::set.rhs(lp, if (M$orientation == "in") .LP_INF else -.LP_INF,
+                        exclude + 1L)
+  }
+  st <- solve(lp)
+  if (!is.null(exclude)) lpSolveAPI::set.rhs(lp, 0, exclude + 1L)
+
+  if (!st %in% c(0L, 1L)) {
+    return(list(status = st, eff = NA_real_, v = rep(NA_real_, p),
+                u = rep(NA_real_, q), u0 = NA_real_))
+  }
+  z <- lpSolveAPI::get.variables(lp)
+  list(status = st,
+       eff = lpSolveAPI::get.objective(lp),
+       v   = z[seq_len(p)],
+       u   = z[p + seq_len(q)],
+       ## u0 is reported in the sign the TABLE above uses, which is the sign it
+       ## carries in the objective -- so that for vrs its sign is the usual
+       ## returns-to-scale reading rather than its negative.
+       u0  = if (M$has0) z[nv] else NA_real_)
+}

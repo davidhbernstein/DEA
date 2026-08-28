@@ -1,5 +1,6 @@
 export(dea, dea_sbm, dea_ddf, dea_add, dea_rts, dea_boot, dea_sim, dea_rate,
-       efficiency, peers, slacks)
+       dea_cost, dea_revenue, dea_profit, dea_cross,
+       efficiency, peers, slacks, multipliers)
 
 import("lpSolveAPI")
 
@@ -21,6 +22,21 @@ S3method(nobs,    dea)
 S3method(efficiency, dea)
 S3method(peers,      dea)
 S3method(slacks,     dea)
+
+S3method(multipliers, dea)
+
+S3method(print,      dea_price)
+S3method(summary,    dea_price)
+S3method(efficiency, dea_price)
+S3method(fitted,     dea_price)
+S3method(peers,      dea_price)
+S3method(nobs,       dea_price)
+
+S3method(print,       dea_cross)
+S3method(summary,     dea_cross)
+S3method(efficiency,  dea_cross)
+S3method(multipliers, dea_cross)
+S3method(nobs,        dea_cross)
 
 S3method(print,   dea_rts)
 S3method(summary, dea_rts)

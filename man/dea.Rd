@@ -10,7 +10,8 @@ second-stage slacks and Andersen-Petersen super-efficiency.
 dea(x, y, data = NULL,
     rts = c("vrs", "crs", "nirs", "ndrs", "fdh"),
     orientation = c("in", "out"),
-    slack = TRUE, super = FALSE, peers = TRUE, scaling = TRUE,
+    slack = TRUE, super = FALSE, multipliers = FALSE,
+    peers = TRUE, scaling = TRUE,
     xref = NULL, yref = NULL, dataref = NULL)
 }
 \arguments{
@@ -47,6 +48,13 @@ Pareto-Koopmans efficiency. See \sQuote{Details}.}
 \item{super}{Andersen-Petersen (1993) super-efficiency: score each DMU against
 a technology it is excluded from, which breaks the ties among the efficient
 units. See \sQuote{Details} for the infeasibility that comes with it.}
+\item{multipliers}{Also solve the \emph{multiplier} (dual) program at each
+DMU and return the optimal weights \eqn{v} on the inputs, \eqn{u} on the
+outputs and the returns-to-scale intercept \eqn{u_0}. Off by default because
+it is a second linear program per DMU and most callers want the score, which
+strong duality makes identical either way. Not available for
+\code{rts = "fdh"}, which is not convex and so has no multiplier form. See
+\sQuote{Details} and \code{\link{multipliers}}.}
 \item{peers}{Keep the \eqn{n \times n} matrix of intensity weights. Set
 \code{FALSE} for large samples, where it is the dominant memory cost.}
 \item{scaling}{Rescale every input and output column to mean one before

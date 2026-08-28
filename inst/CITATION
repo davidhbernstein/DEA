@@ -2,13 +2,16 @@ citHeader("To cite DEA in publications use:")
 
 bibentry(bibtype = "Manual",
          title  = "DEA: Data Envelopment Analysis",
-         author = c(person("David H. Bernstein")),
+         author = c(person("David H. Bernstein"),
+                    person("Zuleyka Diaz-Martinez"),
+                    person("Jose Fernandez-Menendez")),
          year   = "2026",
          note   = "R package version 1.0.0",
          url    = "https://CRAN.R-project.org/package=DEA",
 
          textVersion =
-         paste("David H. Bernstein (2026).",
+         paste("David H. Bernstein, Zuleyka Diaz-Martinez and",
+               "Jose Fernandez-Menendez (2026).",
                "DEA: Data Envelopment Analysis.",
                "R package version 1.0.0.",
                "https://CRAN.R-project.org/package=DEA")

@@ -1,3 +1,56 @@
+## Resubmission
+
+This is a resubmission of `DEA` 1.0.0, rejected on 2026-08-25 with:
+
+> Is this related to the archived package?
+> If yes: Rejected as copyright and authors are not correctly cited.
+> If no: Rejected: Please choose a unique name.
+
+**The answer is yes**, and the citation has been corrected.
+
+`DEA` 0.1-2 was published in February 2008 by Zuleyka Diaz-Martinez and Jose
+Fernandez-Menendez and archived thereafter. This package is its successor: it
+covers the same models -- CCR, BCC, additive and slacks-based efficiency -- and
+takes over the name with the original authors' agreement. I contacted them and
+both have given permission to be added to the package. I can forward that
+correspondence on request.
+
+What has changed since the rejected version:
+
+* **Both original authors are now listed as authors** in `Authors@R`, each with
+  a `comment` recording precisely what they authored:
+
+      Zuleyka Diaz-Martinez [aut] (author of the original DEA package (2008),
+        which this package succeeds)
+      Jose Fernandez-Menendez [aut] (author of the original DEA package (2008),
+        which this package succeeds)
+
+* **The Description field states the relationship**, so a user arriving from
+  the archive is told what this is without having to open NEWS.
+
+* **`NEWS.md` maps the old API onto the new one** function by function, and
+  all sixteen entry points of 0.1-2 are now covered, envelopment and multiplier
+  form alike. The multiplier form was the one genuine gap when 1.0.0 was first
+  submitted: the score was there, since the two programs are duals and attain
+  the same value, but the optimal weights `v` and `u` that
+  `dea.ccr.io.mul()` and its siblings returned were not. `dea(..., multipliers
+  = TRUE)` and `multipliers()` now return them. The mapping was checked
+  against the archived tarball function by function, not from memory.
+
+### On copyright
+
+No copyright holder is declared beyond the authors, and deliberately so. **No
+code from 0.1-2 is included** -- not adapted, not translated, not referenced.
+The old package bundled a C implementation of the simplex method taken from
+GLPK; this one has no compiled code at all and solves through **lpSolveAPI**.
+The implementation is new throughout, so there is no third-party copyright to
+declare. The relationship is one of succession in name, subject and
+maintainership, not of derived code, and I would rather state that plainly than
+have it inferred.
+
+If you would prefer the original authors recorded as `ctb` rather than `aut`,
+or a `cph` entry added, I am happy to make either change.
+
 ## Test environments
 
 * local macOS 26.5 (aarch64), R 4.5.2
@@ -12,74 +65,39 @@
 
 0 errors | 0 warnings | 1 note.
 
-The note is from CRAN's own incoming check and reads:
+The note is from the incoming check and reads:
 
     New submission
     Package was archived on CRAN
 
-Both lines are expected: this is a first submission, and it deliberately
-reuses an archived name — see the next section. Everything else checks clean;
-there are no notes arising from the package itself.
+Both lines are expected. There are no notes arising from the package itself.
 
-## This submission reuses an archived package name
-
-`DEA` 0.1-2 was published in February 2008 by Zuleyka Diaz-Martinez and Jose
-Fernandez-Menendez and archived thereafter; there has been no release in
-eighteen years. This submission reuses that name for an entirely new package.
-
-I want to be explicit about what that means, so nothing is discovered later:
-
-* **The code is unrelated.** Nothing from the 2008 package is reused, adapted
-  or referenced. There is no shared authorship and no shared source. The old
-  package also carried a bundled C implementation of the simplex algorithm
-  taken from GLPK; this one has no compiled code at all and solves through
-  **lpSolveAPI**.
-
-* **The subject matter is close, which is the reason for wanting the name.**
-  `DEA` 0.1-2 provided CCR, BCC, additive and slacks-based models in both
-  envelopment and multiplier form. This package provides radial CCR/BCC
-  efficiency (plus non-increasing, non-decreasing and free-disposal
-  technologies), the slacks-based measure, the directional distance function,
-  and the Simar-Wilson bootstrap. It is a successor in topic, not in code.
-
-* **The API is not backwards compatible**, and cannot be. The old package
-  exported sixteen functions of the form `dea.ccr.io.env()`,
-  `dea.sbm.bcc.oo()` and so on; none of them exist here, where the same choices
-  are arguments to `dea()` and `dea_sbm()`. Anyone with code written against
-  0.1-2 will find that it does not run. Given that the package has been off
-  CRAN since 2008, I judge the population of such code to be effectively empty,
-  but the incompatibility is real and I would rather state it plainly.
-  `NEWS.md` carries a table mapping the old names onto the new ones.
-
-* **The version is 1.0.0**, which is greater than the archived 0.1-2. I noticed
-  in checking that an apparently natural 0.1.0 for a first release would in
-  fact have been a *downgrade* under R's version ordering.
-
-* `NEWS.md` opens by saying all of the above, so a user arriving from the
-  archive is not misled.
-
-If you would prefer this not reuse the archived name, I am happy to rename and
-resubmit — `deafit`, `deatools`, `npdea` and `deainfer` are all free, and the
-change is mechanical. I would also gladly make contact with the original
-maintainers first if that is the process you would rather I follow.
+A local run also emits notes for `checking HTML version of manual` (this
+machine's `tidy` is too old and `V8` is not installed) and occasionally
+`unable to verify current time`. Both are properties of the machine, not of the
+package.
 
 ## Other notes
+
+* The version is 1.0.0 rather than 0.1.0 because R orders `0.1.0` *below* the
+  archived `0.1-2`, so a first release numbered 0.1.0 would have been a
+  downgrade.
 
 * The package solves n linear programs per call through **lpSolveAPI** and has
   no compiled code of its own.
 
 * Examples and the vignette use small samples and low bootstrap replication
   counts deliberately, so the whole check runs in well under a minute.
-  `dea_boot()`'s example uses `B = 50` and the vignette `B = 100`, each with a
-  note that 2000 is the usual recommendation in practice. The one slower
-  example is marked `\donttest{}`.
+  `dea_boot()`'s example uses `B = 50` and the vignette `B = 100`, each noting
+  that 2000 is the usual recommendation. The one slower example is marked
+  `\donttest{}`.
 
 * The bundled data set `charnes1981` is the Program Follow Through data of
   Charnes, Cooper and Rhodes (1981), the original DEA application. The same
   figures are already distributed on CRAN in `Benchmarking` (as
   `charnes1981`) and `npsf` (as `ccr81`), both GPL-2; the two copies were
-  checked against each other and agree on every value before this one was
-  made. Columns are renamed and the programme indicator is logical rather than
+  checked against each other and agree on every value before this one was made.
+  Columns are renamed and the programme indicator is logical rather than
   integer, but no measurement has been altered, and the source is credited in
   the help page.
 

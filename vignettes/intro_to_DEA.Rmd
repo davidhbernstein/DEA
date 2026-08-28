@@ -173,3 +173,94 @@ A slope of −0.5 on eight dimensions. The 1981 analysis is still the right
 analysis of that data; it is simply an analysis whose efficient set is large
 because the space is large, and the nineteen sites scoring 1 should be read as
 "not dominated by any observed combination" rather than as "best practice".
+
+## Ranking the units that tied
+
+Nineteen sites score 1 and the model cannot separate them. That is not a
+failure of the data — it is what "not dominated by any observed combination"
+means in eight dimensions. But it leaves the question a Program Follow Through
+evaluator actually had, which of these sites to learn from, unanswered.
+
+Cross-efficiency answers it by replacing self-appraisal with peer appraisal.
+Ordinary DEA lets every site choose the weights that flatter it most; here each
+site is also scored under *every other* site's chosen weights, and the average
+is its cross-efficiency.
+
+```{r}
+ben <- dea_cross(x, y, secondary = "benevolent")
+summary(ben)
+```
+
+All seventy are ranked, with no ties. The `maverick` column is the gap between
+what a site awards itself and what its peers award it: a large value marks a
+site that looks efficient only under weights nobody else would choose.
+
+**The weights are not unique, and this matters enough to report twice.** An
+efficient site has an entire face of optimal weight vectors, all giving it a
+score of 1 and all giving *other* sites different scores. A cross-efficiency
+computed from whichever vertex the solver stopped at is therefore an artefact.
+Doyle and Green's secondary goals bracket it — hold each site's own score fixed
+and then either maximize or minimize the average score it awards everyone else:
+
+```{r}
+agg <- dea_cross(x, y, secondary = "aggressive")
+range(ben$eff - agg$eff)
+```
+
+A ranking that survives from one end of that bracket to the other is in the
+data. One that does not was in the solver. Reporting a single cross-efficiency
+without saying which secondary goal produced it is the common practice and it
+is not a defensible one.
+
+## When prices are known
+
+Everything above measures distance to the frontier without asking what anything
+costs. That is the right default, because prices are usually unavailable. When
+they are available they answer a question technical efficiency cannot: a site
+can sit exactly on the frontier and still be spending its budget on the wrong
+things.
+
+```{r}
+w  <- c(1.4, 0.9, 2.1, 1.2, 1.0)   # one price list, faced by every site
+ce <- dea_cost(x, y, w, rts = "crs")
+ce
+```
+
+Cost efficiency factors exactly into the two:
+
+$$CE_o \;=\; \underbrace{\theta_o}_{\text{technical}} \times \underbrace{AE_o}_{\text{allocative}}$$
+
+and the print output above makes the point of the exercise: of the nineteen
+sites that are technically efficient, only two are also buying the cheapest mix
+that would keep them there. The other seventeen are on the frontier and still
+overspending.
+
+```{r}
+sum(ce$technical > 1 - 1e-9)   # technically efficient
+sum(ce$eff == 1)               # and allocatively efficient too
+```
+
+`dea_revenue()` does the same on the output side. `dea_profit()` uses both
+price vectors, and reports the Nerlovian profit gap rather than a ratio —
+observed profit is routinely zero or negative, so a ratio is undefined exactly
+where the question is most interesting. That measure *adds* into technical plus
+allocative rather than multiplying, and it needs variable returns: maximum
+profit over a cone is unbounded as soon as one unit is profitable.
+
+## The weights themselves
+
+Every radial score can be read off either of two programs. The envelopment form
+asks which combination of other units dominates this one; the multiplier form
+asks what prices would make this unit look as good as possible. Strong duality
+makes them agree on the score, but only the second returns the weights:
+
+```{r}
+fit <- dea(x, y, rts = "crs", orientation = "in", multipliers = TRUE)
+round(head(multipliers(fit), 4), 4)
+```
+
+Each row satisfies $v'x_o = 1$ in the caller's own units, and values no site
+above break-even. Zeros are common and are the substantive finding: a zero
+weight is an input the site has chosen to declare irrelevant to its own
+assessment. Restricting that freedom is what assurance regions are for, and
+they are not in this version.

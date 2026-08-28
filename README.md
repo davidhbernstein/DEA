@@ -7,20 +7,24 @@
 <!-- badges: end -->
 
 **Data envelopment analysis in R.** Five nonparametric efficiency estimators
-behind one interface and one result object, with the sampling theory that DEA
-practice usually leaves out: bias correction, confidence intervals, and an
-honest statement of how fast any of it can converge.
+behind one interface and one result object; cost, revenue and profit efficiency
+where prices are known, and cross-efficiency where they are not; and the
+sampling theory that DEA practice usually leaves out: bias correction,
+confidence intervals, and an honest statement of how fast any of it can
+converge.
 
-Written by David H. Bernstein. A companion to
+Written by David H. Bernstein, succeeding the original `DEA` package of
+Zuleyka Díaz-Martínez and José Fernández-Menéndez. A companion to
 [`sfa`](https://github.com/davidhbernstein/sfa), which does the parametric half
 of the same problem.
 
-> **Note on the name.** This package reuses the name of `DEA` 0.1-2, published
-> in 2008 by different authors and archived shortly afterwards. It shares no
-> code with it and its API is entirely different; see
+> **On the name.** This package succeeds `DEA` 0.1-2, published in 2008 by
+> Zuleyka Díaz-Martínez and José Fernández-Menéndez and archived shortly
+> afterwards. The name is taken over with their permission and both are
+> credited as authors. It covers the same models, but shares no code — the
+> implementation is new throughout and the API is entirely different. See
 > [`NEWS.md`](NEWS.md) for a table mapping the old function names onto the new
-> arguments. Version numbering starts at 1.0.0 because 0.1.0 would rank below
-> the archived 0.1-2.
+> arguments.
 
 ## Installation
 
@@ -90,14 +94,39 @@ plot(fit)
 | `dea_ddf()` | the directional distance function of Chambers, Chung and Färe (1996), which handles zero and negative data |
 | `dea_add()` | the additive model of Charnes et al. (1985), unweighted or as the Range Adjusted Measure |
 | `dea_rts()` | scale efficiency and the returns-to-scale classification |
+| `dea_cost()`, `dea_revenue()` | cost and revenue efficiency, each factoring exactly into technical × allocative |
+| `dea_profit()` | Nerlovian profit inefficiency, which decomposes by addition rather than multiplication |
+| `dea_cross()` | cross-efficiency, with the Doyle–Green benevolent and aggressive secondary goals |
+| `multipliers()` | the optimal weights `v`, `u`, `u0` from the multiplier form of any radial fit |
 | `dea_boot()` | bias correction and confidence intervals, by the Simar–Wilson (1998) smoothed homogeneous bootstrap |
 | `dea_sim()` | a technology with a closed-form answer, for testing an estimator against a truth |
 | `dea_rate()` | the rate at which any of this can converge |
 | `charnes1981` | the Program Follow Through data the CCR model was introduced on |
 
 All the estimators return an object of class `"dea"`, so `print()`,
-`summary()`, `plot()`, `efficiency()`, `peers()`, `slacks()` and `fitted()`
-work the same way across them.
+`summary()`, `plot()`, `efficiency()`, `peers()`, `slacks()`, `multipliers()`
+and `fitted()` work the same way across them. The price models and
+cross-efficiency return their own classes, with the same methods where the same
+question makes sense.
+
+```r
+## On the frontier, but buying the wrong mix for the prices you face?
+ce <- dea_cost(x, y, w = c(1.4, 0.9, 2.1, 1.2, 1.0), rts = "crs")
+sum(ce$technical > 1 - 1e-9)   # 19 sites are technically efficient
+sum(ce$eff == 1)               # 2 of them are also allocatively efficient
+
+## 19 sites tie at 1 and cannot be ranked. Cross-efficiency ranks all 70.
+ben <- dea_cross(x, y, secondary = "benevolent")
+agg <- dea_cross(x, y, secondary = "aggressive")
+range(ben$eff - agg$eff)       # how much the answer depends on whose weights
+```
+
+Cross-efficiency is reported through a *pair* of secondary goals on purpose.
+An efficient DMU has a whole face of optimal weight vectors, all giving it the
+same score of 1 but giving everyone else different ones, so a single
+cross-efficiency number is an artefact of the vertex a solver stopped at. The
+benevolent and aggressive answers bracket it: a ranking that survives from one
+to the other is in the data, and one that does not was in the solver.
 
 ## Four things this package insists on
 

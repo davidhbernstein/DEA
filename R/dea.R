@@ -26,6 +26,7 @@ dea <- function(x, y, data = NULL,
                 orientation = c("in", "out"),
                 slack = TRUE,
                 super = FALSE,
+                multipliers = FALSE,
                 peers = TRUE,
                 scaling = TRUE,
                 xref = NULL, yref = NULL, dataref = NULL) {
@@ -46,11 +47,27 @@ dea <- function(x, y, data = NULL,
   XRs <- sc$X; YRs <- sc$Y
   Xs  <- sweep(X, 2L, sc$sx, "/"); Ys <- sweep(Y, 2L, sc$sy, "/")
 
+  if (multipliers && identical(rts, "fdh")) {
+    stop("multipliers = TRUE is not available for rts = \"fdh\". The free ",
+         "disposal hull is not convex, so it is not the feasible set of a ",
+         "linear program and has no supporting price vector -- there is no ",
+         "multiplier form to return, rather than one that is merely ",
+         "unimplemented.", call. = FALSE)
+  }
+
   out <- if (identical(rts, "fdh")) {
     .dea_fdh(Xs, Ys, XRs, YRs, orientation, super, n, nr, p, q)
   } else {
     .dea_radial(Xs, Ys, XRs, YRs, rts, orientation, super, slack, peers, n, nr, p, q)
   }
+
+  ## The multiplier sweep is a second family of programs over the same
+  ## technology, run only when asked for: it doubles the solve time and most
+  ## callers want the score, not the prices that support it.
+  mult <- if (multipliers) {
+    .dea_multipliers(Xs, Ys, XRs, YRs, rts, orientation, super, n, nr, p, q,
+                     sc$sx, sc$sy, d, colnames(X), colnames(Y))
+  } else NULL
 
   ## Snap to the boundary. A simplex solver returns 0.9999999998 where the
   ## answer is exactly 1, and leaving that in makes every downstream "is this
@@ -83,6 +100,10 @@ dea <- function(x, y, data = NULL,
                   eff == 1 & rowSums(sx) <= .DEA_CONSTANTS$TOL_SLACK &
                   rowSums(sy) <= .DEA_CONSTANTS$TOL_SLACK,
     status = out$status,
+    ## The multiplier form: v on the inputs, u on the outputs, u0 the
+    ## returns-to-scale intercept. NULL unless multipliers = TRUE.
+    v = mult$v, u = mult$u, u0 = mult$u0, mult_status = mult$status,
+    multipliers = multipliers,
     x = X, y = Y, xref = XR, yref = YR, self_ref = d$self,
     dmu = d$dmu, ref = d$ref, n = n, nref = nr, p = p, q = q,
     scaling = scaling, slack = slack,
@@ -128,6 +149,34 @@ dea <- function(x, y, data = NULL,
     }
   }
   list(eff = eff, lambda = L, sx = sx, sy = sy, status = st, sum_lambda = suml)
+}
+
+## The multiplier sweep, and the unscaling that has to go with it.
+##
+## SCALING IS NOT NEUTRAL FOR THE WEIGHTS, even though it is neutral for the
+## score. Columns were divided by their reference means before solving, so a
+## weight returned by the solver applies to x_i / sx_i and not to x_i; the
+## weight the caller asked about is therefore v_i / sx_i. Returning the solver's
+## numbers unchanged would give weights that satisfy v'x_o = 1 in units nobody
+## supplied. u0 needs no such correction -- it multiplies the constant 1, which
+## has no units.
+.dea_multipliers <- function(Xs, Ys, XRs, YRs, rts, orientation, super,
+                             n, nr, p, q, sx, sy, d, xnames, ynames) {
+  M  <- .lp_mult_build(XRs, YRs, rts, orientation)
+  V  <- matrix(NA_real_, n, p)
+  U  <- matrix(NA_real_, n, q)
+  u0 <- rep(NA_real_, n)
+  st <- integer(n)
+  for (o in seq_len(n)) {
+    r <- .lp_mult_at(M, Xs, Ys, o, exclude = if (super) o else NULL)
+    V[o, ] <- r$v; U[o, ] <- r$u; u0[o] <- r$u0; st[o] <- r$status
+  }
+  V <- sweep(V, 2L, sx, "/")
+  U <- sweep(U, 2L, sy, "/")
+  dimnames(V) <- list(d$dmu, xnames)
+  dimnames(U) <- list(d$dmu, ynames)
+  names(u0) <- d$dmu
+  list(v = V, u = U, u0 = if (M$has0) u0 else NULL, status = st)
 }
 
 .dea_fdh <- function(Xs, Ys, XRs, YRs, orientation, super, n, nr, p, q) {
