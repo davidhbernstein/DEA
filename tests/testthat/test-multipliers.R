@@ -89,17 +89,28 @@ test_that("u0 obeys the sign table for nirs and ndrs, in both orientations", {
 })
 
 test_that("multipliers agree with Benchmarking wherever the optimum is unique", {
-  skip_if_not_installed("Benchmarking")
+  ## The reference file already carries Benchmarking's weights under THIS
+  ## package's names. Theirs are transposed relative to ours: dea(DUAL = TRUE)
+  ## returns `ux` for the INPUT weights and `vy` for the OUTPUT weights, the
+  ## reverse of the CCR notation. The swap is undone once, in
+  ## tools/make_reference_values.R, so it does not have to be re-derived here.
   d <- toy(25, p = 2, q = 2, returns = 0.9, seed = 12)
-  b <- Benchmarking::dea(d$x, d$y, RTS = "crs", ORIENTATION = "in", DUAL = TRUE)
   m <- suppressWarnings(dea(d$x, d$y, rts = "crs", orientation = "in",
                             slack = FALSE, multipliers = TRUE))
+  ref <- ref_values("multipliers_Benchmarking.csv")
+  wide <- function(w, k) {
+    r <- ref[ref$which == w, ]
+    matrix(r$value[order(r$j, r$dmu)], nrow(d$x), k)
+  }
+  bv <- wide("v", ncol(d$x)); bu <- wide("u", ncol(d$y))
+
   ineff <- m$eff < 1 - 1e-6
-  expect_equal(unname(m$v[ineff, ]), unname(b$ux[ineff, ]), tolerance = 1e-6)
-  expect_equal(unname(m$u[ineff, ]), unname(b$vy[ineff, ]), tolerance = 1e-6)
+  expect_true(any(ineff))
+  expect_equal(unname(m$v[ineff, ]), bv[ineff, ], tolerance = 1e-6)
+  expect_equal(unname(m$u[ineff, ]), bu[ineff, ], tolerance = 1e-6)
   ## And where they disagree, the DMU is efficient -- alternate optima, not a
   ## discrepancy. Both vectors give the same score; only the vertex differs.
-  differs <- rowSums(abs(m$v - b$ux)) > 1e-6
+  differs <- rowSums(abs(unname(m$v) - bv)) > 1e-6
   expect_true(all(m$eff[differs] > 1 - 1e-6))
 })
 

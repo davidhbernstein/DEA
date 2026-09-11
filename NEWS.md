@@ -1,3 +1,70 @@
+# DEA 1.0.1
+
+Documentation and testing only. **No user-visible behaviour changes**: every
+function returns exactly what it returned in 1.0.0.
+
+## Exact property tests
+
+A new test file asserts properties rather than values — statements that must
+hold for every estimator, on any data, with no reference answer to compare
+against. A value test catches a wrong formula; a property test catches a wrong
+*index*, which produces plausible numbers on the fixture it was written against
+and survives comparison with another package that makes the same slip.
+
+Every estimator is registered in one table and every applicable property
+applied to each: invariance to rescaling each column separately, invariance to
+the order of the rows, invariance to duplicating a DMU, monotonicity in the
+reference set, agreement between the envelopment and multiplier solutions,
+and the cross-model identities tying `dea_ddf()` to `dea()` (`beta = 1 - theta`
+for a direction of `x`, `beta = phi - 1` for a direction of `y`). The
+estimators that are *not* units invariant — the unweighted additive model and a
+fixed-direction directional model, both by design — are asserted to remain so,
+since silently gaining an invariance is as much a defect as losing one.
+
+One property is asserted to **fail**, and it is the reason `dea_cross()`
+defaults to `secondary = "benevolent"`. Without a secondary goal the
+cross-efficiency weights are not determined, and reordering the rows of the
+data moves the scores by about 1e-2 — first order relative to the scores
+themselves. With either Doyle-Green secondary goal the answer is invariant to
+1e-8.
+
+## Fewer dependencies
+
+**`Benchmarking` and `DJL` have been removed from `Suggests`.** A DEA package
+should not make rival DEA packages a dependency of any kind: CRAN installs
+Suggests in order to check, so their breakage becomes this package's check
+failure, and a reader assessing what `DEA` costs to install should not find the
+field listed underneath it.
+
+Installing `DEA` now pulls in exactly one package that is not part of R itself
+— `lpSolveAPI`, which has no dependencies of its own.
+
+Nothing was lost from the test suite. The two packages were used only to
+confirm that this one solves the same linear programs, behind
+`skip_if_not_installed()` — which meant the comparison was **silently skipped
+on any machine without them**, including most of CRAN's. Their answers are now
+recorded in `tests/testthat/reference/`, and the suite compares against those
+unconditionally, on every machine. The live comparison still happens, and still
+covers every technology and orientation; it just happens in a maintainer script
+that is not shipped, and which refuses to update the recorded values if this
+package and theirs ever disagree.
+
+## `?dea_boot` now maps onto the published algorithm
+
+Two new sections. **The algorithm, step by step** ties each of the eight steps
+of Simar and Wilson's (1998) Algorithm #1 to what the code does, including the
+bandwidth (computed on the reflected `2n` points, not on the `n` scores), the
+variance correction after smoothing, the folding rule at the boundary, and the
+exact form of the interval.
+
+**What is assumed, and when it fails** states, for the first time, that this is
+the *homogeneous* bootstrap: it assumes the inefficiency distribution does not
+depend on the input-output mix, and where that fails the procedure is not
+consistent. The remedy is the heterogeneous bootstrap of Simar and Wilson
+(2000), which this package does not implement. The existing refusals for
+free-disposal-hull and super-efficiency fits are given their reasons in the
+same place.
+
 # DEA 1.0.0
 
 First release.

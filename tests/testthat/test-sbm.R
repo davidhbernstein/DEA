@@ -46,16 +46,16 @@ test_that("dea_sbm() refuses data it cannot divide by", {
   expect_error(dea_sbm(d$x, y0), "no output at all|strictly positive")
 })
 
-test_that("results agree with an independent implementation", {
-  skip_if_not_installed("DJL")
-  d <- toy(n = 40, p = 2, q = 2, seed = 4)
+test_that("results agree with DJL's recorded answers", {
+  d   <- toy(n = 40, p = 2, q = 2, seed = 4)
+  ref <- ref_values("sbm_DJL.csv")
   for (rts in c("crs", "vrs")) {
     for (ori in c("none", "in", "out")) {
       ours <- dea_sbm(d$x, d$y, rts = rts, orientation = ori)
-      theirs <- suppressWarnings(suppressMessages(
-        DJL::dm.sbm(d$x, d$y, rts = rts, orientation = substr(ori, 1, 1))))
-      expect_equal(as.numeric(ours$eff), as.numeric(theirs$eff),
-                   tolerance = 1e-6, info = paste(rts, ori))
+      r <- ref[ref$rts == rts & ref$orientation == ori, ]
+      r <- r[order(r$dmu), ]
+      expect_equal(as.numeric(ours$eff), r$eff, tolerance = 1e-6,
+                   info = paste(rts, ori))
     }
   }
 })

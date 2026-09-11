@@ -1,6 +1,6 @@
 Package: DEA
-Version: 1.0.0
-Date: 2026-08-28
+Version: 1.0.1
+Date: 2026-09-10
 Title: Data Envelopment Analysis
 Type: Package
 Authors@R: c(person("David", "Bernstein",
@@ -24,8 +24,7 @@ Description: Nonparametric efficiency measurement by data envelopment analysis.
     cross-efficiency with the secondary goals of Doyle and Green (1994) ranks
     units that a self-appraisal leaves tied.  This package succeeds the
     archived 'DEA' package of Diaz-Martinez and Fernandez-Menendez (2008).
-Suggests: knitr, rmarkdown, testthat (>= 3.0.0), Benchmarking, DJL,
-    parallel, grDevices
+Suggests: knitr, rmarkdown, testthat (>= 3.0.0), parallel, grDevices
 Imports: lpSolveAPI, stats, graphics, utils
 Depends: R (>= 4.0.0)
 License: GPL (>= 2)

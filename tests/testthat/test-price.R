@@ -57,27 +57,22 @@ test_that("scaling changes nothing in the price models", {
   expect_equal(a$optimal_q, b$optimal_q, tolerance = 1e-8)
 })
 
-test_that("the price models agree with Benchmarking on every technology", {
-  skip_if_not_installed("Benchmarking")
+test_that("the price models match Benchmarking's recorded optima", {
   d <- toy(25, p = 2, q = 2, returns = 0.9, seed = 12)
   n <- nrow(d$x)
   W <- matrix(rep(c(1.2, 0.8), each = n), n, 2)
   P <- matrix(rep(c(2.0, 3.1), each = n), n, 2)
-  map <- c(vrs = "vrs", crs = "crs", drs = "nirs", irs = "ndrs")
-  for (B in names(map)) {
-    co <- Benchmarking::cost.opt(d$x, d$y, W, RTS = B)
-    o1 <- dea_cost(d$x, d$y, W, rts = map[[B]])
-    expect_equal(unname(rowSums(co$xopt * W)), unname(o1$optimal),
-                 tolerance = 1e-8, info = B)
-    ro <- Benchmarking::revenue.opt(d$x, d$y, P, RTS = B)
-    o2 <- dea_revenue(d$x, d$y, P, rts = map[[B]])
-    expect_equal(unname(rowSums(ro$yopt * P)), unname(o2$optimal),
-                 tolerance = 1e-8, info = B)
+  ref <- ref_values("price_Benchmarking.csv")
+  for (rts in c("vrs", "crs", "nirs", "ndrs")) {
+    r <- ref[ref$rts == rts, ]; r <- r[order(r$dmu), ]
+    expect_equal(unname(dea_cost(d$x, d$y, W, rts = rts)$optimal),
+                 r$cost_opt, tolerance = 1e-8, info = rts)
+    expect_equal(unname(dea_revenue(d$x, d$y, P, rts = rts)$optimal),
+                 r$revenue_opt, tolerance = 1e-8, info = rts)
   }
-  po <- Benchmarking::profit.opt(d$x, d$y, W, P, RTS = "vrs")
-  o3 <- dea_profit(d$x, d$y, W, P, rts = "vrs")
-  expect_equal(unname(rowSums(po$yopt * P) - rowSums(po$xopt * W)),
-               unname(o3$profit_max), tolerance = 1e-8)
+  r <- ref[ref$rts == "vrs", ]; r <- r[order(r$dmu), ]
+  expect_equal(unname(dea_profit(d$x, d$y, W, P, rts = "vrs")$profit_max),
+               r$profit_max_vrs, tolerance = 1e-8)
 })
 
 test_that("profit is refused under constant and non-decreasing returns", {

@@ -16,14 +16,19 @@ test_that("charnes1981 has the shape and provenance its help page claims", {
   expect_true(all(num > 0))
 })
 
-test_that("charnes1981 matches the copies already on CRAN", {
-  ## The whole claim of the help page's Source section, asserted. If either
-  ## upstream copy is ever corrected, this fails and the discrepancy gets
-  ## looked at rather than quietly persisting.
-  skip_if_not_installed("Benchmarking")
+test_that("charnes1981 matches the copy already on CRAN", {
+  ## The claim of the help page's Source section, asserted EXACTLY -- these are
+  ## the values Benchmarking 0.33 ships, recorded verbatim. Compared at
+  ## tolerance 0, so any drift in the copy this package ships is a failure
+  ## rather than a rounding question.
+  ##
+  ## What this no longer catches is an upstream CORRECTION: if Benchmarking
+  ## amends its copy, nothing here notices. That was a real if unlikely
+  ## benefit of calling the package live, and the duty moves to ../horserace/.
   data(charnes1981, envir = environment())
-  e <- new.env(); utils::data("charnes1981", package = "Benchmarking", envir = e)
-  up <- get("charnes1981", envir = e)
+  up <- ref_values("charnes1981_Benchmarking.csv")
+  up <- up[order(up$dmu), ]
+  expect_equal(nrow(charnes1981), nrow(up))
   for (v in c(paste0("x", 1:5), paste0("y", 1:3))) {
     expect_equal(charnes1981[[v]], up[[v]], tolerance = 0, info = v)
   }

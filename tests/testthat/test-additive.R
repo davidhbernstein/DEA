@@ -62,15 +62,13 @@ test_that("RAM and MIP are units invariant; the unweighted model is not", {
   expect_equal(unname(a$efficient), unname(b$efficient))
 })
 
-test_that("the unweighted total matches Benchmarking::dea.add", {
-  skip_if_not_installed("Benchmarking")
-  d <- toy(n = 40, p = 2, q = 2, seed = 8)
-  alias <- c(crs = "crs", vrs = "vrs", nirs = "drs", ndrs = "irs")
-  for (rts in names(alias)) {
+test_that("the unweighted total matches dea.add's recorded answers", {
+  d   <- toy(n = 40, p = 2, q = 2, seed = 8)
+  ref <- ref_values("additive_Benchmarking.csv")
+  for (rts in c("crs", "vrs", "nirs", "ndrs")) {
     ours <- dea_add(d$x, d$y, measure = "unweighted", rts = rts, scaling = FALSE)
-    th <- suppressWarnings(Benchmarking::dea.add(d$x, d$y, RTS = alias[[rts]]))
-    expect_equal(as.numeric(ours$eff), as.numeric(th$sum), tolerance = 1e-7,
-                 info = rts)
+    r <- ref[ref$rts == rts, ]; r <- r[order(r$dmu), ]
+    expect_equal(as.numeric(ours$eff), r$sum, tolerance = 1e-7, info = rts)
   }
 })
 

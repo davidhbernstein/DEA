@@ -86,23 +86,23 @@ test_that("super-efficiency exceeds ordinary efficiency, and is NA when infeasib
   expect_false(any(is.na(supv$eff[ordv$eff < 1 - 1e-8])))
 })
 
-test_that("results agree with Benchmarking, which solves the same programs", {
-  skip_if_not_installed("Benchmarking")
-  d <- toy(n = 60, p = 2, q = 2, seed = 9)
-  alias <- c(crs = "crs", vrs = "vrs", nirs = "drs", ndrs = "irs", fdh = "fdh")
-  for (rts in names(alias)) {
+test_that("results agree with Benchmarking's recorded answers", {
+  d   <- toy(n = 60, p = 2, q = 2, seed = 9)
+  ref <- ref_values("radial_Benchmarking.csv")
+  for (rts in c("crs", "vrs", "nirs", "ndrs", "fdh")) {
     for (ori in c("in", "out")) {
-      ours   <- dea(d$x, d$y, rts = rts, orientation = ori, slack = FALSE)
-      theirs <- suppressWarnings(
-        Benchmarking::dea(d$x, d$y, RTS = alias[[rts]], ORIENTATION = ori))
-      expect_equal(unname(ours$eff), unname(theirs$eff), tolerance = 1e-7,
+      ours <- dea(d$x, d$y, rts = rts, orientation = ori, slack = FALSE)
+      r <- ref[ref$rts == rts & ref$orientation == ori, ]
+      r <- r[order(r$dmu), ]
+      expect_equal(unname(ours$eff), r$eff, tolerance = 1e-7,
                    info = paste(rts, ori))
     }
   }
-  ## Super-efficiency too, including which DMUs come back infeasible.
-  ours   <- dea(d$x, d$y, rts = "vrs", orientation = "in", super = TRUE)
-  theirs <- suppressWarnings(Benchmarking::sdea(d$x, d$y, RTS = "vrs", ORIENTATION = "in"))
-  expect_equal(unname(is.na(ours$eff)), unname(!is.finite(theirs$eff)))
-  ok <- is.finite(theirs$eff)
-  expect_equal(unname(ours$eff[ok]), unname(theirs$eff[ok]), tolerance = 1e-7)
+  ## Super-efficiency too, including which DMUs come back infeasible. They
+  ## report Inf where this package reports NA; what must match is WHICH units.
+  ours <- dea(d$x, d$y, rts = "vrs", orientation = "in", super = TRUE)
+  s <- ref_values("super_Benchmarking.csv"); s <- s[order(s$dmu), ]
+  expect_equal(unname(is.na(ours$eff)), !as.logical(s$feasible))
+  ok <- as.logical(s$feasible)
+  expect_equal(unname(ours$eff[ok]), s$eff[ok], tolerance = 1e-7)
 })
