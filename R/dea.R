@@ -72,6 +72,19 @@ dea <- function(x, y, data = NULL,
   ## Snap to the boundary. A simplex solver returns 0.9999999998 where the
   ## answer is exactly 1, and leaving that in makes every downstream "is this
   ## DMU efficient" test a lottery.
+  ## Report DMUs that did not solve. dea() was the ONLY entry point that never
+  ## did this -- dea_sbm(), dea_add() and the price models all have called
+  ## .dea_report_unsolved() from the start -- so a numerical failure in the
+  ## radial path returned NA and said nothing.
+  ##
+  ## Under super-efficiency an infeasible program is the DOCUMENTED result, not
+  ## a fault: removing a DMU from its own reference set can leave nothing that
+  ## dominates it. Those are masked so the warning stays about real failures;
+  ## the NA is the signal there, and ?dea explains it.
+  rep_status <- out$status
+  if (super) rep_status[rep_status == 2L] <- 0L
+  .dea_report_unsolved(rep_status, n, d$self, "dea")
+
   eff <- out$eff
   eff[is.finite(eff) & abs(eff - 1) < .DEA_CONSTANTS$TOL_EFF] <- 1
   names(eff) <- d$dmu
@@ -124,6 +137,17 @@ dea <- function(x, y, data = NULL,
 
   for (o in seq_len(n)) {
     r <- .lp_radial_at(B, Xs, Ys, o, exclude = if (super) o else NULL)
+    ## See the note on the stage-two retry below: a reused lpSolveAPI object
+    ## carries basis state between DMUs, and a fresh one is the fix. Stage one
+    ## has not been observed to fail where stage two does, but the failure mode
+    ## is a property of the reuse rather than of the program, so it is guarded
+    ## the same way. An infeasible program (status 2) is NOT retried -- that is
+    ## an answer about the data, and under super-efficiency it is the expected
+    ## one.
+    if (!r$status %in% c(0L, 1L, 2L)) {
+      B2 <- .lp_radial_build(XRs, YRs, rts, orientation)
+      r  <- .lp_radial_at(B2, Xs, Ys, o, exclude = if (super) o else NULL)
+    }
     eff[o] <- r$eff; st[o] <- r$status
     suml[o] <- if (all(is.na(r$lambda))) NA_real_ else sum(r$lambda)
     if (peers) L[o, ] <- r$lambda
@@ -142,6 +166,36 @@ dea <- function(x, y, data = NULL,
       rhs_x <- if (orientation == "in") eff[o] * Xs[o, ] else Xs[o, ]
       rhs_y <- if (orientation == "in") Ys[o, ] else eff[o] * Ys[o, ]
       z <- .lp_slack_at(S, rhs_x, rhs_y)
+      ## RETRY ON A FRESH LP. The single object is reused across all n DMUs and
+      ## only its right-hand side is rewritten -- that is where this package's
+      ## speed comes from -- but lpSolveAPI carries basis and factorisation
+      ## state along with it, and for some right-hand sides that inherited
+      ## state is bad enough that the solve gives up with status 5.
+      ##
+      ## It is not a tolerance problem and loosening epsel does not touch it:
+      ## of 56 failures on a 1200-DMU variable-returns fit, epsel from 1e-12 to
+      ## 1e-9 fixed one, every scaling mode fixed at most a quarter, and
+      ## guess.basis() fixed one -- while REBUILDING THE OBJECT fixed all 56.
+      ## So the state is the cause and a fresh object is the remedy.
+      ##
+      ## The cost is bounded by how often it happens: about 5% of DMUs at
+      ## n = 1200 under vrs, none at all under crs, and none at small n. Paying
+      ## a rebuild on those is far cheaper than rebuilding for everyone, which
+      ## is the alternative that would undo the design.
+      if (!z$status %in% c(0L, 1L)) {
+        S2 <- .lp_slack_build(XRs, YRs, rts)
+        z  <- .lp_slack_at(S2, rhs_x, rhs_y)
+      }
+      ## STAGE TWO'S STATUS HAS TO BE RECORDED. It was not, and the hole was
+      ## silent: a slack program that failed returned NA slacks while `status`
+      ## kept stage one's 0, no warning was raised, and `efficient` became NA
+      ## for that DMU with nothing to say why. Found when a 1200-DMU fit gave
+      ## one NA slack row that disappeared once the reference set was thinned --
+      ## i.e. it was a conditioning failure on the larger program all along.
+      ##
+      ## Stage one's status is kept where stage two succeeded, so a DMU that is
+      ## infeasible radially still reports 2 rather than being overwritten.
+      if (!z$status %in% c(0L, 1L)) st[o] <- z$status
       sx[o, ] <- z$sx; sy[o, ] <- z$sy
       ## Stage two's lambda is the one that survives a Pareto-Koopmans
       ## projection, so it replaces stage one's where both exist.

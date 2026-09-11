@@ -1,3 +1,44 @@
+# DEA 1.0.2
+
+Two silent defects in the radial path, both in how solver failures were
+handled. No interface changes.
+
+## Failed DMUs were not reported
+
+`dea()` was the only entry point that never called the internal reporter that
+`dea_sbm()`, `dea_add()` and the price models have always used. A DMU whose
+linear program failed came back as `NA` with nothing said about it.
+
+Worse, `.dea_radial()` never read the **second stage's** status at all. The
+radial score is found first and the slacks by a second program from that
+projection; if the second one failed, its `NA` slacks were stored while
+`status` kept the first stage's `0`. The fit then reported a DMU as solved,
+with missing slacks, and `efficient` quietly `NA`.
+
+Both are fixed: stage two's status is recorded, and `dea()` reports. Under
+`super = TRUE` an infeasible program is the documented result rather than a
+fault, so those stay silent.
+
+## The failures themselves are fixed
+
+Those two bugs were hiding **56 of 1200 DMUs failing numerically** on a
+variable-returns fit — about 5%, growing with `n`, and absent under constant
+returns.
+
+The cause is not tolerance. The package builds one linear program per
+(technology, orientation) and rewrites only the right-hand side for each DMU,
+which is where its speed comes from — but `lpSolveAPI` carries basis and
+factorisation state on that object, and for some right-hand sides the inherited
+state is bad enough that the solve gives up. Of those 56 failures, loosening
+`epsel` from 1e-12 to 1e-9 fixed one, every scaling mode fixed at most a
+quarter, and `guess.basis()` fixed one — while rebuilding the object fixed all
+56.
+
+So a failed solve is now retried once on a fresh program. Failures are rare
+enough that the rebuild costs little, and none of the tested designs — up to
+n = 1200 across five technologies and both orientations — now leaves any DMU
+unsolved.
+
 # DEA 1.0.1
 
 Documentation and testing only. **No user-visible behaviour changes**: every

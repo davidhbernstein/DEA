@@ -1,6 +1,6 @@
 Package: DEA
-Version: 1.0.1
-Date: 2026-09-10
+Version: 1.0.2
+Date: 2026-09-11
 Title: Data Envelopment Analysis
 Type: Package
 Authors@R: c(person("David", "Bernstein",
