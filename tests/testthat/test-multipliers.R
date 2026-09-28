@@ -52,17 +52,63 @@ test_that("scaling leaves the multipliers themselves unchanged", {
   expect_equal(a$u[ineff, ], b$u[ineff, ], tolerance = 1e-6)
 })
 
-test_that("the weights are FEASIBLE in the multiplier program", {
-  ## u'Y_j - v'X_j - u0 <= 0 for every reference DMU: this is what makes the
-  ## weights a supporting price vector rather than an arbitrary positive one.
+## The residual of the technology constraint at DMU o against reference DMU j.
+## Input orientation:   u'Y_j - v'X_j - u0 <= 0
+## Output orientation:  v'X_j - u'Y_j - u0 >= 0
+## Written once because the two tests below both need it, and because getting
+## the orientation's sign wrong here would make both of them vacuous.
+mult_residual <- function(f, x, y) {
+  u0 <- if (is.null(f$u0)) rep(0, nrow(x)) else f$u0
+  if (f$orientation == "in") f$u %*% t(y) - f$v %*% t(x) - u0
+  else                       f$v %*% t(x) - f$u %*% t(y) - u0
+}
+
+test_that("the weights are FEASIBLE in the multiplier program, both orientations", {
+  ## This is what makes the weights a supporting price vector rather than an
+  ## arbitrary positive one. Note what it does NOT catch: with the u0 sign
+  ## table inverted the weights stay feasible to 1e-12, because they are then
+  ## a valid price vector for a DIFFERENT technology. The complementary
+  ## slackness test below is what has teeth against that.
   d <- toy(30, p = 2, q = 2, returns = 0.9)
   for (rts in c("crs", "vrs", "nirs", "ndrs")) {
-    f <- suppressWarnings(dea(d$x, d$y, rts = rts, orientation = "in",
-                              slack = FALSE, multipliers = TRUE))
-    u0 <- if (is.null(f$u0)) rep(0, nrow(d$x)) else f$u0
-    lhs <- f$u %*% t(d$y) - f$v %*% t(d$x) - u0
-    expect_true(all(lhs <= 1e-7), info = rts)
-    expect_true(all(f$v >= -1e-9) && all(f$u >= -1e-9), info = rts)
+    for (ori in c("in", "out")) {
+      f <- suppressWarnings(dea(d$x, d$y, rts = rts, orientation = ori,
+                                slack = FALSE, multipliers = TRUE))
+      R <- mult_residual(f, d$x, d$y)
+      if (ori == "in") expect_true(all(R <=  1e-7), info = paste(rts, ori))
+      else             expect_true(all(R >= -1e-7), info = paste(rts, ori))
+      expect_true(all(f$v >= -1e-9) && all(f$u >= -1e-9), info = paste(rts, ori))
+    }
+  }
+})
+
+test_that("complementary slackness ties the peers to the weights", {
+  ## For a linear program, complementary slackness holds between ANY optimal
+  ## primal solution and ANY optimal dual solution -- not merely between a
+  ## corresponding pair. So although the envelopment and multiplier programs
+  ## are solved independently here, a reference DMU carrying positive lambda
+  ## MUST have its multiplier constraint exactly tight. Non-uniqueness of the
+  ## weights does not weaken this; it is a theorem about the optimal faces.
+  ##
+  ## WHY IT EARNS ITS PLACE. It is the only check here that catches an
+  ## inverted u0 sign table in every case. Feasibility does not catch it at
+  ## all, and the value-agreement test above catches it only where the
+  ## restriction binds -- which is why that one carries a skip_if. Measured
+  ## against a deliberately inverted table, the residual at a positive lambda
+  ## goes from 1e-12 to between 0.4 and 1.6 for all four of nirs/ndrs by
+  ## in/out.
+  d <- dea_sim(40, p = 2, q = 2, returns = 0.9, seed = 5)
+  for (rts in c("crs", "vrs", "nirs", "ndrs")) {
+    for (ori in c("in", "out")) {
+      f <- suppressWarnings(dea(d$x, d$y, rts = rts, orientation = ori,
+                                slack = FALSE, multipliers = TRUE))
+      R <- mult_residual(f, d$x, d$y)
+      pos <- f$lambda > 1e-7
+      ## A degenerate sample with no positive lambda anywhere would make this
+      ## vacuous; assert there is something to check before checking it.
+      expect_true(sum(pos) > 0, info = paste(rts, ori))
+      expect_lt(max(abs(R[pos])), 1e-6)
+    }
   }
 })
 

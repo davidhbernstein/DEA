@@ -50,6 +50,31 @@ still does not give a usable test. The measurement is kept, reproducible, in
 `horserace/homogeneity_experiment.R` of the development repository, along with
 why neither route works.
 
+## Complementary slackness now ties the peers to the multipliers
+
+The `u0` sign table is the part of this package most likely to be silently
+wrong: getting a sign backwards does not error, it solves a different
+technology's program and returns a plausible number. It had two guards. Neither
+was enough on its own.
+
+Feasibility of the weights has **no** teeth against a sign error at all --- with
+the table deliberately inverted the weights stay feasible to 1e-12, because
+they are then a valid price vector for a different technology. Value agreement
+against the envelopment form does catch it, but only where the returns-to-scale
+restriction binds, which is why that test carries a `skip_if`.
+
+The new check has teeth everywhere. For a linear program, complementary
+slackness holds between *any* optimal primal solution and *any* optimal dual
+solution, so a reference DMU carrying positive `lambda` must have its multiplier
+constraint exactly tight --- even though the two programs are solved
+independently here, and even though the weights are non-unique at an efficient
+DMU. Measured against an inverted table, the residual at a positive `lambda`
+goes from 1e-12 to between 0.4 and 1.6 in all four of nirs/ndrs by in/out.
+
+The feasibility test also now runs in both orientations rather than the input
+one alone; the output form's constraint has the opposite sense, and it was
+untested.
+
 # DEA 1.0.2
 
 Two silent defects in the radial path, both in how solver failures were
