@@ -88,6 +88,20 @@ and DMUs that are not solved are reported as \code{NA} with a warning saying
 which of the three it was. Under \code{rts = "fdh"} no linear program is
 solved, but the codes mean the same thing: a DMU with no dominating peer is
 reported as 2, so the field can be read the same way across every technology.}
+\item{mult_status}{The same, for the multiplier (dual) program, and present
+only when \code{multipliers = TRUE}. It is a \emph{separate} field because it
+can differ from \code{status}: the two are different linear programs, and a
+DMU whose score solved can still have weights that did not. Failures are
+reported with their own warning.
+
+The codes do not mean quite what they mean for the envelopment program. If
+that program is feasible and bounded then strong duality makes its dual
+feasible and bounded too, so an infeasible dual is a contradiction rather than
+a statement about the data --- which is why the dual is retried on a fresh
+program where the envelopment sweep would not bother. The converse case is
+ordinary: under \code{super = TRUE} an infeasible envelopment program has an
+unbounded dual, and both are reported, one as \code{NA} score and the other as
+\code{NA} weights.}
 \item{x, y, xref, yref}{The data, as coerced.}
 \item{n, nref, p, q}{Counts of evaluated DMUs, reference DMUs, inputs and
 outputs.}

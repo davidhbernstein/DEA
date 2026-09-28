@@ -78,6 +78,39 @@ different size from the evaluated set --- 12 scored against 50 --- because with
 `n == nref` every place that indexes a reference column by `n` still works,
 which is how one such bug once survived every self-referenced test.
 
+## A fourth silent failure, this time in the multiplier program
+
+Found while adding the complementary slackness check above, which is the point
+of adding it.
+
+1.0.2 fixed two places where a linear program failed and said nothing, and
+1.0.3 fixed a third. The multiplier (dual) sweep was the fourth and last: it
+had neither the retry nor the reporting. A dual that failed returned `NA`
+weights while `status` --- which describes the *envelopment* program --- went
+on saying 0. The dual's own code was recorded in `mult_status`, and nothing
+ever read it.
+
+**Only super-efficiency fits were affected.** Ordinary fits show no dual
+failures at all, including at n = 800 under either technology.
+
+**The retry.** The same lpSolveAPI basis carryover as in 1.0.2: on a 40-DMU
+constant-returns super-efficiency fit, four DMUs came back infeasible on the
+reused program and solved to optimality on a fresh one. Note this is retried
+where the envelopment sweep deliberately does *not* retry an infeasible
+program. In the dual that reasoning inverts --- if the envelopment program is
+feasible and bounded, strong duality makes its dual feasible and bounded too,
+so an infeasible dual is a contradiction rather than an answer.
+
+**The reporting** masks the documented case: under super-efficiency an
+infeasible envelopment program has an unbounded dual, and warning about it
+would be noise about an answer already given as `NA`. The mask is on the
+*pairing* --- a dual failure whose envelopment program was infeasible --- and
+not on the status code, because the solver does not name that case
+consistently: one DMU reported it as 5 on five successive fresh programs. A
+dual that fails where the envelopment program solved is still reported.
+
+`?dea` now documents `mult_status`, which was returned but never described.
+
 # DEA 1.0.2
 
 Two silent defects in the radial path, both in how solver failures were

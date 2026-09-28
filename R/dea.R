@@ -90,6 +90,14 @@ dea <- function(x, y, data = NULL,
                          "a single reference DMU" else
                          "some convex combination of the reference DMUs")
 
+  ## The multiplier sweep has its own status, and until 1.0.3 nothing read it:
+  ## a dual that failed returned NA weights while `status` -- which describes
+  ## the ENVELOPMENT program -- kept saying 0. Same silent hole that
+  ## .dea_radial()'s stage two had.
+  if (!is.null(mult)) {
+    .dea_report_mult_unsolved(mult$status, out$status, n, super)
+  }
+
   eff <- out$eff
   eff[is.finite(eff) & abs(eff - 1) < .DEA_CONSTANTS$TOL_EFF] <- 1
   names(eff) <- d$dmu
@@ -228,6 +236,26 @@ dea <- function(x, y, data = NULL,
   st <- integer(n)
   for (o in seq_len(n)) {
     r <- .lp_mult_at(M, Xs, Ys, o, exclude = if (super) o else NULL)
+    ## RETRY ON A FRESH LP, for the same reason stage two of .dea_radial()
+    ## does: the object is reused across all n DMUs and carries basis and
+    ## factorisation state, which for some DMUs is bad enough that the solve
+    ## gives up.
+    ##
+    ## NOTE WHAT IS RETRIED HERE AND NOT THERE. The envelopment path does NOT
+    ## retry an infeasible program, because infeasibility is an answer about
+    ## the data and under super-efficiency it is the expected one. In the DUAL
+    ## that reasoning inverts: if the envelopment program is feasible and
+    ## bounded then strong duality makes its dual feasible and bounded too, so
+    ## a dual reported INFEASIBLE is a contradiction rather than an answer, and
+    ## the dual of an infeasible envelopment program is UNBOUNDED (3), not
+    ## infeasible (2). So status 2 is retried here and status 3 is not an
+    ## error. Measured on a 40-DMU super-efficiency fit: four DMUs returned
+    ## status 2 on the reused object under crs, and a fresh object solved all
+    ## four to optimality.
+    if (!r$status %in% c(0L, 1L, 3L)) {
+      M2 <- .lp_mult_build(XRs, YRs, rts, orientation)
+      r  <- .lp_mult_at(M2, Xs, Ys, o, exclude = if (super) o else NULL)
+    }
     V[o, ] <- r$v; U[o, ] <- r$u; u0[o] <- r$u0; st[o] <- r$status
   }
   V <- sweep(V, 2L, sx, "/")

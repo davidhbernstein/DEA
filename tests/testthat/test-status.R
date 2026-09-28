@@ -107,3 +107,62 @@ test_that("a self-referenced free-disposal fit never reports infeasible", {
     expect_false(any(is.na(fit$eff)), info = ori)
   }
 })
+
+## ---------------------------------------------------------------------------
+## The fourth of the same shape, found while checking complementary slackness:
+## the MULTIPLIER sweep had neither the retry nor the reporting. A dual that
+## failed returned NA weights while `status` -- which describes the envelopment
+## program -- went on saying 0. Only super-efficiency fits were affected;
+## ordinary fits show no dual failures even at n = 800.
+## ---------------------------------------------------------------------------
+
+test_that("a reused LP object no longer loses multipliers under super-efficiency", {
+  ## Four DMUs here returned lpSolve status 2 on the reused object and solved
+  ## to optimality on a fresh one. Infeasibility is a contradiction for this
+  ## program: the envelopment program is feasible and bounded for every DMU
+  ## under crs, so strong duality makes its dual feasible and bounded too.
+  d <- dea_sim(40, p = 2, q = 2, returns = 0.9, seed = 5)
+  for (ori in c("in", "out")) {
+    f <- suppressWarnings(dea(d$x, d$y, rts = "crs", orientation = ori,
+                              super = TRUE, slack = FALSE, multipliers = TRUE))
+    expect_true(all(f$status == 0L), info = ori)
+    expect_true(all(f$mult_status %in% c(0L, 1L)), info = ori)
+    expect_false(any(is.na(f$v)), info = ori)
+    expect_false(any(is.na(f$u)), info = ori)
+  }
+})
+
+test_that("every surviving dual failure pairs with an infeasible envelopment program", {
+  ## Under vrs some duals still do not solve, and that is the DOCUMENTED
+  ## super-efficiency case rather than a fault: the envelopment program is
+  ## infeasible, the score is NA, and the dual has no bounded optimum. What
+  ## must not happen is a dual failing where the envelopment program solved.
+  d <- dea_sim(40, p = 2, q = 2, returns = 0.9, seed = 5)
+  for (ori in c("in", "out")) {
+    f <- suppressWarnings(dea(d$x, d$y, rts = "vrs", orientation = ori,
+                              super = TRUE, slack = FALSE, multipliers = TRUE))
+    bad <- !f$mult_status %in% c(0L, 1L)
+    expect_true(all(f$status[bad] == 2L), info = ori)
+  }
+  ## And that documented case must stay silent -- warning about it would be
+  ## noise about an answer the user has already been given as NA.
+  expect_silent(dea(d$x, d$y, rts = "crs", super = TRUE, slack = FALSE,
+                    multipliers = TRUE))
+})
+
+test_that("the multiplier reporter warns on a dual failure the duality theorem forbids", {
+  ## Driven directly, because a solver inconsistency cannot be produced on
+  ## demand from data. status 2 on the dual where the envelopment program
+  ## solved (0) contradicts strong duality and must be reported, under
+  ## super-efficiency as much as without it.
+  rep <- DEA:::.dea_report_mult_unsolved
+  expect_warning(rep(c(0L, 2L), c(0L, 0L), 2L, super = FALSE), "NA MULTIPLIERS")
+  expect_warning(rep(c(0L, 2L), c(0L, 0L), 2L, super = TRUE),  "NA MULTIPLIERS")
+  ## The documented pairing is masked only under super-efficiency, where it is
+  ## the expected result; without it, the same pairing is still a fault.
+  expect_silent(rep(c(0L, 3L), c(0L, 2L), 2L, super = TRUE))
+  expect_warning(rep(c(0L, 3L), c(0L, 2L), 2L, super = FALSE), "NA MULTIPLIERS")
+  ## Whatever the solver calls the unbounded dual, the pairing is what counts.
+  expect_silent(rep(c(0L, 5L), c(0L, 2L), 2L, super = TRUE))
+  expect_silent(rep(c(0L, 1L), c(0L, 0L), 2L, super = FALSE))
+})

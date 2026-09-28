@@ -203,6 +203,47 @@
 ## an infeasible program and 5 for a numerical failure, and they call for
 ## opposite responses: infeasibility is a statement about the data, numerical
 ## failure is a statement about the conditioning of the program.
+## The multiplier (dual) sweep's own reporter. Separate from
+## .dea_report_unsolved() because the dual's failure modes do not mean what the
+## envelopment program's mean, and reusing that wording would say the wrong
+## thing: there is no "combination of reference DMUs" at issue here, and an
+## UNBOUNDED dual is the documented super-efficiency result rather than a
+## fault.
+##
+## `env_status` is passed so that the documented case can be recognised rather
+## than assumed. Under super-efficiency the envelopment program can be
+## genuinely INFEASIBLE (status 2) -- removing a DMU from its own reference set
+## can leave nothing that dominates it -- and its score is NA for that reason.
+## The dual of that program has no bounded optimum, so it does not solve
+## either, and warning about it would be noise about an answer the user has
+## already been given.
+##
+## The solver does not name that case consistently: it reports the unbounded
+## dual as 3 for some DMUs and as 5 for others, and repeated rebuilds do not
+## move it (measured: one DMU gave 5 on five successive fresh objects, with
+## its envelopment program infeasible every time). So the mask is on the
+## PAIRING -- any dual failure whose envelopment program was infeasible --
+## rather than on the status code, which would be reading meaning into a label
+## the solver does not use consistently.
+##
+## The pairing is checked rather than assumed: a dual that fails where the
+## envelopment program SOLVED is a real inconsistency, and is still reported.
+.dea_report_mult_unsolved <- function(status, env_status, n, super) {
+  bad <- !status %in% c(0L, 1L)
+  if (super) bad <- bad & env_status != 2L
+  if (!any(bad)) return(invisible(NULL))
+  warning(sum(bad), " of ", n, " DMU(s) returned NA MULTIPLIERS: the dual ",
+          "program did not solve (lpSolve status ",
+          paste(sort(unique(status[bad])), collapse = "/"),
+          "). The efficiency scores are unaffected -- they come from the ",
+          "envelopment program, which has its own `status`. This one is in ",
+          "`mult_status`. A dual reported infeasible where the envelopment ",
+          "program solved contradicts strong duality and means the program ",
+          "could not be solved reliably at these magnitudes; rescale the ",
+          "columns.", call. = FALSE)
+  invisible(NULL)
+}
+
 .dea_report_unsolved <- function(status, n, self_ref, model,
                                  requires = "some convex combination of the reference DMUs") {
   n_inf <- sum(status == 2L)
