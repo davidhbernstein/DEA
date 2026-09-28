@@ -144,6 +144,28 @@ fails and the procedure is not consistent. The remedy is the heterogeneous
 bootstrap of Simar and Wilson (2000), which conditions the resampled density on
 \eqn{(x, y)} and is \strong{not implemented here}.
 
+\strong{Checking homogeneity is harder than it looks.} The obvious check is to
+regress the estimated scores on the inputs and outputs and read off an F
+test. Do not: it rejects homogeneity on data that satisfy it, essentially
+always. Across 200 samples from \code{\link{dea_sim}}, which draws inefficiency
+independently of \eqn{x} by construction, that test rejected at the nominal 10,
+5 and 1 per cent levels in 100 per cent of samples. The reason is that the
+estimator manufactures the association being looked for --- the scores are not
+independent of one another, they are all measured against one frontier
+estimated from the whole sample, and the DEA bias is larger in sparse regions
+of the input space than in dense ones. On the samples above the correlation
+between \eqn{x} and the \emph{true} \eqn{\theta} is \eqn{+0.04} and the
+correlation between \eqn{x} and the \emph{estimated} \eqn{\hat\theta} is
+\eqn{-0.36}. This is the same dependence that invalidates conventional
+standard errors in two-stage DEA regression (Simar and Wilson, 2007).
+
+Replacing the F distribution with a null simulated from the fitted homogeneous
+model removes that objection but does not produce a usable test either; the
+measurement is in \code{horserace/homogeneity_experiment.R} of the package's
+development repository. So the assumption is documented here rather than
+tested, and a user who suspects it fails should treat the intervals with
+corresponding caution rather than look for a diagnostic in this package.
+
 \strong{Convexity.} The resampling scheme is built for the convex DEA
 estimator. Under \code{rts = "fdh"} the relevant procedure is the subsampling
 bootstrap of Jeong and Simar (2006), not this one, and \code{dea_boot} refuses
@@ -172,6 +194,10 @@ how to bootstrap in nonparametric frontier models. \emph{Management Science}
 Simar, L. and Wilson, P. W. (2000). A general methodology for bootstrapping in
 nonparametric frontier models. \emph{Journal of Applied Statistics} 27,
 779--802.
+
+Simar, L. and Wilson, P. W. (2007). Estimation and inference in two-stage,
+semi-parametric models of production processes. \emph{Journal of Econometrics}
+136, 31--64.
 
 Jeong, S.-O. and Simar, L. (2006). Linearly interpolated FDH efficiency score
 for nonconvex frontiers. \emph{Journal of Multivariate Analysis} 97,

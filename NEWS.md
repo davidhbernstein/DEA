@@ -32,6 +32,24 @@ names are also split into given and family parts, so BibTeX no longer braces
 each one as a literal and author-year styles cite "Bernstein et al." rather
 than "David H. Bernstein et al.".
 
+## Why you cannot test the bootstrap's homogeneity assumption by regression
+
+`?dea_boot` has said since 1.0.1 that the Simar-Wilson (1998) bootstrap assumes
+inefficiency does not depend on the input-output mix. It now also says what
+happens if you try to check that by regressing the estimated scores on the
+inputs and outputs: the test rejects on data that satisfy the assumption, in
+100 per cent of 200 samples drawn from a DGP that satisfies it by construction.
+
+The estimator manufactures the association. Scores are all measured against one
+frontier estimated from the whole sample, and the DEA bias is larger in sparse
+regions than in dense ones, so the correlation between an input and the
+*estimated* score is -0.36 where the correlation with the *true* score is +0.04.
+
+A null simulated from the fitted homogeneous model removes that objection and
+still does not give a usable test. The measurement is kept, reproducible, in
+`horserace/homogeneity_experiment.R` of the development repository, along with
+why neither route works.
+
 # DEA 1.0.2
 
 Two silent defects in the radial path, both in how solver failures were
