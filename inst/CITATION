@@ -1,18 +1,25 @@
 citHeader("To cite DEA in publications use:")
 
+## meta is the parsed DESCRIPTION, supplied by citation(); it is NULL when this
+## file is sourced on its own, so fall back to the installed version. Reading
+## the version rather than writing it out keeps citation() from claiming an
+## older release after a version bump.
+ver <- meta$Version
+if (is.null(ver)) ver <- as.character(utils::packageVersion("DEA"))
+
 bibentry(bibtype = "Manual",
          title  = "DEA: Data Envelopment Analysis",
-         author = c(person("David H. Bernstein"),
-                    person("Zuleyka Diaz-Martinez"),
-                    person("Jose Fernandez-Menendez")),
+         author = c(person("David H.", "Bernstein"),
+                    person("Zuleyka", "Diaz-Martinez"),
+                    person("Jose", "Fernandez-Menendez")),
          year   = "2026",
-         note   = "R package version 1.0.0",
+         note   = paste("R package version", ver),
          url    = "https://CRAN.R-project.org/package=DEA",
 
          textVersion =
          paste("David H. Bernstein, Zuleyka Diaz-Martinez and",
                "Jose Fernandez-Menendez (2026).",
                "DEA: Data Envelopment Analysis.",
-               "R package version 1.0.0.",
+               paste0("R package version ", ver, "."),
                "https://CRAN.R-project.org/package=DEA")
 )

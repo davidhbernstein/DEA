@@ -20,6 +20,18 @@ unaffected, because every DMU dominates itself.
 `?dea` now documents what the three status codes mean rather than only what 0
 means.
 
+## A startup message, and a citation that keeps up with the version
+
+Attaching the package now prints its version and points at `citation('DEA')`,
+matching `sfa`.
+
+`inst/CITATION` used to write the version out by hand, so it went on claiming
+1.0.0 after the package moved past it. It now reads `meta$Version` from the
+DESCRIPTION, which is what makes the startup message's advice true. Author
+names are also split into given and family parts, so BibTeX no longer braces
+each one as a literal and author-year styles cite "Bernstein et al." rather
+than "David H. Bernstein et al.".
+
 # DEA 1.0.2
 
 Two silent defects in the radial path, both in how solver failures were
