@@ -73,7 +73,10 @@ goes from 1e-12 to between 0.4 and 1.6 in all four of nirs/ndrs by in/out.
 
 The feasibility test also now runs in both orientations rather than the input
 one alone; the output form's constraint has the opposite sense, and it was
-untested.
+untested. And the same slackness check now runs against a reference set of a
+different size from the evaluated set --- 12 scored against 50 --- because with
+`n == nref` every place that indexes a reference column by `n` still works,
+which is how one such bug once survived every self-referenced test.
 
 # DEA 1.0.2
 

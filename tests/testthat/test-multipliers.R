@@ -199,3 +199,36 @@ test_that("multipliers work against an external reference set", {
   expect_equal(unname(rowSums(mul$u * e$y) - mul$u0), unname(env$eff),
                tolerance = 1e-7)
 })
+
+test_that("complementary slackness holds against a DIFFERENT-SIZED reference set", {
+  ## 12 evaluated against 50 reference. The point is the size difference: with
+  ## n == nref every place that indexes a reference column by `n` still works,
+  ## which is how one such bug survived every self-referenced test in
+  ## .sbm_oriented(). Here the residual matrix is 12 x 50 and `lambda` is
+  ## 12 x 50, and both must be indexed by the REFERENCE set -- an evaluated-set
+  ## index would not even conform.
+  d <- toy(50, p = 2, q = 2, returns = 0.9, seed = 5)
+  e <- toy(12, p = 2, q = 2, returns = 0.9, seed = 6)
+  for (rts in c("crs", "vrs", "nirs", "ndrs")) {
+    for (ori in c("in", "out")) {
+      f <- suppressWarnings(dea(e$x, e$y, rts = rts, orientation = ori,
+                                slack = FALSE, multipliers = TRUE,
+                                xref = d$x, yref = d$y))
+      u0 <- if (is.null(f$u0)) rep(0, nrow(e$x)) else f$u0
+      R <- if (ori == "in") f$u %*% t(d$y) - f$v %*% t(d$x) - u0
+           else             f$v %*% t(d$x) - f$u %*% t(d$y) - u0
+      expect_identical(dim(R), dim(f$lambda))
+      expect_identical(ncol(R), nrow(d$x))
+
+      ## An out-of-sample DMU can be genuinely INFEASIBLE under vrs/nirs: its
+      ## output may exceed anything the reference set can produce, and then no
+      ## convex combination dominates it. That is reported as status 2 with an
+      ## NA score, and those rows have no optimal pair to check.
+      ok <- f$status == 0L & is.finite(f$eff)
+      expect_true(any(ok), info = paste(rts, ori))
+      pos <- f$lambda[ok, , drop = FALSE] > 1e-7
+      expect_true(sum(pos) > 0, info = paste(rts, ori))
+      expect_lt(max(abs(R[ok, , drop = FALSE][pos])), 1e-6)
+    }
+  }
+})
