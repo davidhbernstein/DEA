@@ -203,13 +203,14 @@
 ## an infeasible program and 5 for a numerical failure, and they call for
 ## opposite responses: infeasibility is a statement about the data, numerical
 ## failure is a statement about the conditioning of the program.
-.dea_report_unsolved <- function(status, n, self_ref, model) {
+.dea_report_unsolved <- function(status, n, self_ref, model,
+                                 requires = "some convex combination of the reference DMUs") {
   n_inf <- sum(status == 2L)
   n_num <- sum(!status %in% c(0L, 1L, 2L))
   if (n_inf > 0L) {
     warning(n_inf, " of ", n, " DMU(s) gave an INFEASIBLE program and are ",
-            "reported as NA. ", model, " needs some convex combination of the ",
-            "reference DMUs to weakly dominate the evaluated point in every ",
+            "reported as NA. ", model, " needs ", requires,
+            " to weakly dominate the evaluated point in every ",
             "input and every output; a point outside the estimated technology ",
             "has none. ",
             if (!self_ref)

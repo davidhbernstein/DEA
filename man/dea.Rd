@@ -81,7 +81,13 @@ scale.}
 \item{efficient}{Logical. Pareto-Koopmans efficiency when slacks were computed
 -- on the frontier radially AND with no slack left -- and radial efficiency
 otherwise.}
-\item{status}{Per-DMU \pkg{lpSolveAPI} return code; 0 is an optimal solve.}
+\item{status}{Per-DMU solver code: 0 an optimal solve, 2 an infeasible
+program, anything else a numerical failure. The three call for different
+responses -- nothing, a statement about the data, and a conditioning problem --
+and DMUs that are not solved are reported as \code{NA} with a warning saying
+which of the three it was. Under \code{rts = "fdh"} no linear program is
+solved, but the codes mean the same thing: a DMU with no dominating peer is
+reported as 2, so the field can be read the same way across every technology.}
 \item{x, y, xref, yref}{The data, as coerced.}
 \item{n, nref, p, q}{Counts of evaluated DMUs, reference DMUs, inputs and
 outputs.}

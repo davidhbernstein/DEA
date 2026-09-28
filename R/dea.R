@@ -83,7 +83,12 @@ dea <- function(x, y, data = NULL,
   ## the NA is the signal there, and ?dea explains it.
   rep_status <- out$status
   if (super) rep_status[rep_status == 2L] <- 0L
-  .dea_report_unsolved(rep_status, n, d$self, "dea")
+  ## Free disposal needs one dominating DMU, not a combination of them, and the
+  ## default wording would be wrong for it.
+  .dea_report_unsolved(rep_status, n, d$self, "dea",
+                       requires = if (identical(rts, "fdh"))
+                         "a single reference DMU" else
+                         "some convex combination of the reference DMUs")
 
   eff <- out$eff
   eff[is.finite(eff) & abs(eff - 1) < .DEA_CONSTANTS$TOL_EFF] <- 1
@@ -254,8 +259,23 @@ dea <- function(x, y, data = NULL,
   sx <- projx - XRs[pk, , drop = FALSE]
   sy <- YRs[pk, , drop = FALSE] - projy
   sx[!ok, ] <- NA_real_; sy[!ok, ] <- NA_real_
+  ## A DMU with no dominating peer is INFEASIBLE, and must say so. This used to
+  ## return integer(n) -- status 0, "optimal" -- for every DMU including the
+  ## failures, so an NA score was indistinguishable from a solved one through
+  ## the documented `status` field and dea() had nothing to warn about. Every
+  ## other path in the package reports 2 on the same data; free disposal was
+  ## alone in not doing so.
+  ##
+  ## 2 is lpSolve's infeasibility code even though no LP is solved here: the
+  ## point of `status` is to mean the same thing across models, and the FDH
+  ## program genuinely has no feasible point when nothing dominates the
+  ## evaluated DMU.
+  ##
+  ## Self-referenced fits cannot reach this -- a DMU always dominates itself --
+  ## so this only fires against an external `xref`/`yref`, which is exactly the
+  ## case .dea_report_unsolved() already calls expected.
   list(eff = f$eff, lambda = L, sx = sx, sy = sy,
-       status = integer(n), sum_lambda = ifelse(ok, 1, NA_real_))
+       status = ifelse(ok, 0L, 2L), sum_lambda = ifelse(ok, 1, NA_real_))
 }
 
 ## ---------------------------------------------------------------------------

@@ -1,3 +1,25 @@
+# DEA 1.0.3
+
+## Free disposal now reports an unsolved DMU as unsolved
+
+Reported by GitHub Copilot on issue #1, and confirmed: `rts = "fdh"` returned
+`integer(n)` as its status vector, so **every** DMU looked like an optimal
+solve -- including those with no dominating peer, whose efficiency is `NA`
+because the score does not exist.
+
+The effect was that `$status` could not distinguish a valid free-disposal score
+from one that could not be computed, and `dea()` had nothing to warn about. On
+identical data both `rts = "vrs"` and `dea_sbm()` returned status 2 and warned;
+free disposal was alone in staying silent. It now returns 2 and warns like
+everything else, with wording that says free disposal needs one dominating
+reference DMU rather than a combination of them.
+
+This can only fire against an external `xref`/`yref`. A self-referenced fit is
+unaffected, because every DMU dominates itself.
+
+`?dea` now documents what the three status codes mean rather than only what 0
+means.
+
 # DEA 1.0.2
 
 Two silent defects in the radial path, both in how solver failures were
