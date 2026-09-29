@@ -150,6 +150,38 @@ one, a mean over fewer raters reported as though the whole panel had spoken.
 
 Suite 839 -> 857 assertions, none skipped.
 
+## The retry guard now covers every sweep, and is tested directly
+
+1.0.3 left `dea_sbm()` and the price models without the rebuild-on-failure
+guard, on the grounds that no failure could be produced in either. **That was
+wrong, and wrong because the search was incomplete:** it exercised the
+non-oriented slacks-based program and never the oriented one. A wider search
+finds the oriented measure failing readily --- nine configurations, including
+n = 150 at seed 12, where DMU 108 returns lpSolve status 5 on the reused
+program.
+
+As everywhere else, the failure is recoverable and the recovered answer is
+right: solved independently under four `lpSolve` scaling modes, that DMU's rho
+is exactly 1 in all four, and the package now reports exactly 1 where it
+previously reported `NA`.
+
+**The guard is now one function.** `.lp_solve_retry()` holds the rule that was
+being re-derived at each sweep, including which statuses are answers rather
+than failures --- infeasible is an answer for an envelopment program and is not
+retried, while for the multiplier program an infeasible dual contradicts strong
+duality and is. It is used by the slacks-based, additive, directional, cost,
+revenue and profit sweeps.
+
+**And it is tested directly**, not only through a sweep. A rare branch whose
+first real execution is the day it matters has never been run, so the retry is
+driven with one-variable programs of known status: a solved program is not
+rebuilt, an infeasible one is not rebuilt, anything else is rebuilt once, and
+the caller receives the *fresh* program rather than the failed one.
+
+Nothing else moved. On 800 DMUs the cost, revenue, profit and non-oriented
+slacks-based scores are bit-identical before and after; the only changed number
+in the package is the one DMU that used to be lost.
+
 # DEA 1.0.2
 
 Two silent defects in the radial path, both in how solver failures were

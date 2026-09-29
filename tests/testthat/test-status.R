@@ -195,3 +195,108 @@ test_that("dea_ddf() reports an unsolved DMU instead of returning NA quietly", {
   expect_identical(g$status, f$status)
   expect_equal(unname(f$beta[1]), 1 - unname(g$eff[1]), tolerance = 1e-9)
 })
+
+## ---------------------------------------------------------------------------
+## The retry guard itself. Every sweep reuses one linear program and rewrites
+## only the evaluated DMU's part of it, and lpSolveAPI carries basis state on
+## that object; .lp_solve_retry() rebuilds once when a solve gives up for a
+## reason that is not an answer about the data.
+##
+## The logic is tested directly rather than only through a sweep, because the
+## branch is rare by construction: a guard whose first real execution is the
+## day it matters has never been run.
+## ---------------------------------------------------------------------------
+
+## Three one-variable programs with known, deterministic statuses: 0, 2 and 3.
+tiny_lp <- function(kind) {
+  lp <- lpSolveAPI::make.lp(1L, 1L)
+  lpSolveAPI::lp.control(lp, sense = if (kind == "unbounded") "max" else "min",
+                         verbose = "neutral")
+  lpSolveAPI::set.column(lp, 1L, 1, 1L)
+  lpSolveAPI::set.objfn(lp, 1)
+  lpSolveAPI::set.constr.type(lp, ">=", 1L)
+  if (kind == "unbounded") {
+    lpSolveAPI::set.rhs(lp, 1, 1L)
+    lpSolveAPI::set.bounds(lp, lower = 0, upper = DEA:::.LP_INF, columns = 1L)
+  } else if (kind == "infeasible") {
+    lpSolveAPI::set.rhs(lp, 5, 1L)
+    lpSolveAPI::set.bounds(lp, lower = 0, upper = 1, columns = 1L)
+  } else {
+    lpSolveAPI::set.rhs(lp, 2, 1L)
+    lpSolveAPI::set.bounds(lp, lower = 0, upper = 10, columns = 1L)
+  }
+  lp
+}
+
+test_that("the retry rebuilds only when the status is not an answer", {
+  retry <- DEA:::.lp_solve_retry
+  ## Confirm the fixtures really do produce the statuses the test relies on.
+  expect_identical(solve(tiny_lp("ok")),         0L)
+  expect_identical(solve(tiny_lp("infeasible")), 2L)
+  expect_identical(solve(tiny_lp("unbounded")),  3L)
+
+  ## A solved program is not rebuilt.
+  calls <- 0L
+  fresh <- function() { calls <<- calls + 1L; tiny_lp("ok") }
+  r <- retry(tiny_lp("ok"), fresh)
+  expect_identical(r$status, 0L)
+  expect_identical(calls, 0L)
+
+  ## Nor is an INFEASIBLE one, by default: that is a statement about the data,
+  ## and re-solving cannot change it. This is the case the guard must not
+  ## touch -- under super-efficiency it is the expected result.
+  calls <- 0L
+  r <- retry(tiny_lp("infeasible"), fresh)
+  expect_identical(r$status, 2L)
+  expect_identical(calls, 0L)
+
+  ## Anything else is rebuilt once, and the CALLER GETS THE FRESH PROGRAM --
+  ## reading results off the original would report the failed solve's state.
+  calls <- 0L
+  r <- retry(tiny_lp("unbounded"), fresh)
+  expect_identical(r$status, 0L)          ## the rebuilt one solves
+  expect_identical(calls, 1L)
+  expect_equal(lpSolveAPI::get.objective(r$lp), 2)
+
+  ## `final` is what lets the multiplier program invert the rule: there an
+  ## infeasible dual contradicts strong duality and IS retried, while an
+  ## unbounded dual is the answer and is not.
+  calls <- 0L
+  r <- retry(tiny_lp("infeasible"), fresh, final = c(0L, 1L, 3L))
+  expect_identical(calls, 1L)
+  expect_identical(r$status, 0L)
+  calls <- 0L
+  r <- retry(tiny_lp("unbounded"), fresh, final = c(0L, 1L, 3L))
+  expect_identical(calls, 0L)
+  expect_identical(r$status, 3L)
+})
+
+test_that("the oriented slacks-based measure recovers a DMU the reuse loses", {
+  ## n = 150, seed 12: DMU 108 gives lpSolve status 5 on the reused program.
+  ## Verified as recoverable AND correct -- solved independently under four
+  ## lpSolve scaling modes (none/geometric/curtisreid/extreme) rho is exactly
+  ## 1 in all four, and the package now reports exactly 1.
+  s <- dea_sim(150, p = 3, q = 2, returns = 0.85, seed = 12)
+
+  ## First, the failure is real: replicate the pre-fix sweep, which reuses one
+  ## program and never rebuilds. If this stops failing the regression test
+  ## below has quietly stopped testing anything.
+  sc <- DEA:::.dea_scale(s$x, s$y, TRUE)
+  X <- sc$X; Y <- sc$Y; n <- 150L; p <- 3L; q <- 2L
+  lp <- DEA:::.lp_slack_build(X, Y, "vrs")$lp
+  st <- integer(n)
+  for (o in seq_len(n)) {
+    xo <- pmax(X[o, ], DEA:::.DEA_CONSTANTS$MIN_POS)
+    ob <- numeric(n + p + q); ob[n + seq_len(p)] <- 1/(p * xo)
+    lpSolveAPI::set.objfn(lp, ob)
+    lpSolveAPI::set.rhs(lp, c(X[o, ], Y[o, ]), seq_len(p + q))
+    st[o] <- solve(lp)
+  }
+  expect_identical(which(!st %in% c(0L, 1L)), 108L)
+
+  ## With the guard the DMU is solved, not lost, and silently so.
+  expect_silent(f <- dea_sbm(s$x, s$y, rts = "vrs", orientation = "in"))
+  expect_true(all(f$status %in% c(0L, 1L)))
+  expect_false(any(is.na(f$eff)))
+  expect_equal(unname(f$eff[108]), 1, tolerance = 1e-9)
+})

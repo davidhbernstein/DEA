@@ -114,21 +114,30 @@ dea_profit <- function(x, y, w, r, data = NULL,
   ## max (r'Y' - w'X')lambda subject to the returns-to-scale row alone: the
   ## input and output constraints are what x and y were substituted out of.
   rr <- .rts_row(rts)
-  lp <- lpSolveAPI::make.lp(1L, nr)
-  lpSolveAPI::lp.control(lp, sense = "max", epsel = .DEA_CONSTANTS$LP_EPSEL,
-                         verbose = "neutral")
-  for (j in seq_len(nr)) lpSolveAPI::set.column(lp, j, 1, 1L)
-  lpSolveAPI::set.constr.type(lp, rr, 1L)
-  lpSolveAPI::set.rhs(lp, 1, 1L)
+  ## Built as a function so the program can be REBUILT: see .lp_solve_retry().
+  build <- function() {
+    lp <- lpSolveAPI::make.lp(1L, nr)
+    lpSolveAPI::lp.control(lp, sense = "max", epsel = .DEA_CONSTANTS$LP_EPSEL,
+                           verbose = "neutral")
+    for (j in seq_len(nr)) lpSolveAPI::set.column(lp, j, 1, 1L)
+    lpSolveAPI::set.constr.type(lp, rr, 1L)
+    lpSolveAPI::set.rhs(lp, 1, 1L)
+    lp
+  }
+  lp <- build()
+  aim <- function(lp, o) {
+    lpSolveAPI::set.objfn(lp, as.numeric(YR %*% R[o, ] - XR %*% W[o, ]))
+  }
 
   profit_max <- numeric(n); st <- integer(n)
   L <- if (peers) matrix(0, n, nr) else NULL
   for (o in seq_len(n)) {
-    lpSolveAPI::set.objfn(lp, as.numeric(YR %*% R[o, ] - XR %*% W[o, ]))
-    st[o] <- solve(lp)
+    aim(lp, o)
+    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l })
+    st[o] <- z$status
     if (!st[o] %in% c(0L, 1L)) { profit_max[o] <- NA_real_; next }
-    profit_max[o] <- lpSolveAPI::get.objective(lp)
-    if (peers) L[o, ] <- lpSolveAPI::get.variables(lp)
+    profit_max[o] <- lpSolveAPI::get.objective(z$lp)
+    if (peers) L[o, ] <- lpSolveAPI::get.variables(z$lp)
   }
   if (any(!st %in% c(0L, 1L))) {
     .dea_report_unsolved(st, n, d$self, "dea_profit")
@@ -209,28 +218,37 @@ dea_profit <- function(x, y, w, r, data = NULL,
   k   <- ncol(CM)
   rr  <- .rts_row(rts)
   nrows <- k + (!is.null(rr))
-  lp <- lpSolveAPI::make.lp(nrows, nr)
-  lpSolveAPI::lp.control(lp, sense = if (cost) "min" else "max",
-                         epsel = .DEA_CONSTANTS$LP_EPSEL, verbose = "neutral")
-  rts_one <- if (is.null(rr)) numeric(0) else 1
-  for (j in seq_len(nr)) lpSolveAPI::set.column(lp, j, c(CM[j, ], rts_one))
-  lpSolveAPI::set.constr.type(lp, rep(if (cost) ">=" else "<=", k), seq_len(k))
-  if (!is.null(rr)) {
-    lpSolveAPI::set.constr.type(lp, rr, k + 1L)
-    lpSolveAPI::set.rhs(lp, 1, k + 1L)
+  VS  <- if (cost) XRs else YRs           ## the side being valued
+  ## Built as a function so the program can be REBUILT: see .lp_solve_retry().
+  build <- function() {
+    lp <- lpSolveAPI::make.lp(nrows, nr)
+    lpSolveAPI::lp.control(lp, sense = if (cost) "min" else "max",
+                           epsel = .DEA_CONSTANTS$LP_EPSEL, verbose = "neutral")
+    rts_one <- if (is.null(rr)) numeric(0) else 1
+    for (j in seq_len(nr)) lpSolveAPI::set.column(lp, j, c(CM[j, ], rts_one))
+    lpSolveAPI::set.constr.type(lp, rep(if (cost) ">=" else "<=", k), seq_len(k))
+    if (!is.null(rr)) {
+      lpSolveAPI::set.constr.type(lp, rr, k + 1L)
+      lpSolveAPI::set.rhs(lp, 1, k + 1L)
+    }
+    lp
+  }
+  lp <- build()
+  aim <- function(lp, o) {
+    lpSolveAPI::set.objfn(lp, as.numeric(VS %*% Ps[o, ]))
+    lpSolveAPI::set.rhs(lp, ce[o, ], seq_len(k))
   }
 
-  VS  <- if (cost) XRs else YRs           ## the side being valued
   opt <- numeric(n); st <- integer(n)
   L   <- if (peers) matrix(0, n, nr) else NULL
   OPTQ <- matrix(NA_real_, n, if (cost) p else q)
   for (o in seq_len(n)) {
-    lpSolveAPI::set.objfn(lp, as.numeric(VS %*% Ps[o, ]))
-    lpSolveAPI::set.rhs(lp, ce[o, ], seq_len(k))
-    st[o] <- solve(lp)
+    aim(lp, o)
+    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l })
+    st[o] <- z$status
     if (!st[o] %in% c(0L, 1L)) { opt[o] <- NA_real_; next }
-    opt[o] <- lpSolveAPI::get.objective(lp)
-    lam <- lpSolveAPI::get.variables(lp)
+    opt[o] <- lpSolveAPI::get.objective(z$lp)
+    lam <- lpSolveAPI::get.variables(z$lp)
     if (peers) L[o, ] <- lam
     OPTQ[o, ] <- as.numeric(crossprod(VS, lam))   ## x* (or y*), still scaled
   }

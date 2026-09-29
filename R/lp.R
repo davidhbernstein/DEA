@@ -42,6 +42,44 @@
 ##
 ## Variable 1 is theta (or phi); variables 2..(n+1) are lambda.
 ## ---------------------------------------------------------------------------
+## ---------------------------------------------------------------------------
+## Solve an already-aimed program, and rebuild it once if it gives up.
+##
+## THE FAILURE THIS GUARDS. Every sweep in this package builds ONE linear
+## program per (technology, orientation) and rewrites only the evaluated DMU's
+## column and right-hand side -- that is where the speed comes from. But
+## lpSolveAPI carries basis and factorisation state on that object, and for
+## some right-hand sides the inherited state is bad enough that the solve gives
+## up with status 5. It is not a tolerance problem: of 56 failures on a
+## 1200-DMU variable-returns radial fit, loosening epsel from 1e-12 to 1e-9
+## fixed one, every scaling mode fixed at most a quarter and guess.basis()
+## fixed one, while REBUILDING THE OBJECT fixed all 56. The state is the cause
+## and a fresh object is the remedy.
+##
+## It is a property of the REUSE rather than of any one program, which is why
+## the guard belongs here rather than being re-derived at each sweep. Observed
+## so far in the radial stage-two slack program, the multiplier program, the
+## additive sweep (one DMU of 1200) and the oriented slacks-based measure
+## (seeds 2 and 3 at n = 900 and 1600).
+##
+## WHAT IS NOT RETRIED. `final` lists the statuses that are answers rather than
+## failures. It defaults to infeasible-included, because for an envelopment
+## program infeasibility is a statement about the data -- under
+## super-efficiency it is the expected one -- and re-solving cannot change it.
+## The multiplier program passes a different set: there an infeasible dual
+## contradicts strong duality whenever the primal is feasible and bounded, so
+## it IS retried, while an unbounded dual is the answer and is not.
+##
+## `fresh` must return a newly built program already aimed at the same DMU.
+## Returning the lp that produced the status lets the caller read its results
+## without knowing which of the two it got.
+.lp_solve_retry <- function(lp, fresh, final = c(0L, 1L, 2L)) {
+  st <- solve(lp)
+  if (st %in% final) return(list(status = st, lp = lp))
+  lp2 <- fresh()
+  list(status = solve(lp2), lp = lp2)
+}
+
 .lp_radial_build <- function(X, Y, rts, orientation) {
   n <- nrow(X); p <- ncol(X); q <- ncol(Y)
   rr <- .rts_row(rts)

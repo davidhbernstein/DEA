@@ -122,29 +122,32 @@ dea_sbm <- function(x, y, data = NULL,
   ncols <- 1L + nr + p + q
   ri <- 1L + seq_len(p); ro <- 1L + p + seq_len(q); rr_i <- nrows
 
-  lp <- lpSolveAPI::make.lp(nrows, ncols)
-  lpSolveAPI::lp.control(lp, sense = "min", epsel = .DEA_CONSTANTS$LP_EPSEL,
-                         verbose = "neutral")
-  rts_one <- if (is.null(rr)) numeric(0) else 1
-  for (j in seq_len(nr)) {
-    lpSolveAPI::set.column(lp, 1L + j, c(XR[j, ], YR[j, ], rts_one),
-                           c(ri, ro, if (is.null(rr)) NULL else rr_i))
+  ## Built as a function so the program can be REBUILT: see .lp_solve_retry().
+  build <- function() {
+    lp <- lpSolveAPI::make.lp(nrows, ncols)
+    lpSolveAPI::lp.control(lp, sense = "min", epsel = .DEA_CONSTANTS$LP_EPSEL,
+                           verbose = "neutral")
+    rts_one <- if (is.null(rr)) numeric(0) else 1
+    for (j in seq_len(nr)) {
+      lpSolveAPI::set.column(lp, 1L + j, c(XR[j, ], YR[j, ], rts_one),
+                             c(ri, ro, if (is.null(rr)) NULL else rr_i))
+    }
+    for (i in seq_len(p)) lpSolveAPI::set.column(lp, 1L + nr + i, 1, ri[i])
+    for (r in seq_len(q)) lpSolveAPI::set.column(lp, 1L + nr + p + r, -1, ro[r])
+
+    lpSolveAPI::set.constr.type(lp, rep("=", 1L + p + q), seq_len(1L + p + q))
+    lpSolveAPI::set.rhs(lp, c(1, rep(0, p + q)), seq_len(1L + p + q))
+    if (!is.null(rr)) {
+      lpSolveAPI::set.constr.type(lp, rr, rr_i)
+      lpSolveAPI::set.rhs(lp, 0, rr_i)
+    }
+    lp
   }
-  for (i in seq_len(p)) lpSolveAPI::set.column(lp, 1L + nr + i, 1, ri[i])
-  for (r in seq_len(q)) lpSolveAPI::set.column(lp, 1L + nr + p + r, -1, ro[r])
+  lp <- build()
 
-  lpSolveAPI::set.constr.type(lp, rep("=", 1L + p + q), seq_len(1L + p + q))
-  lpSolveAPI::set.rhs(lp, c(1, rep(0, p + q)), seq_len(1L + p + q))
-  if (!is.null(rr)) {
-    lpSolveAPI::set.constr.type(lp, rr, rr_i)
-    lpSolveAPI::set.rhs(lp, 0, rr_i)
-  }
-
-  eff <- numeric(n); st <- integer(n)
-  sx <- matrix(NA_real_, n, p); sy <- matrix(NA_real_, n, q)
-  L  <- if (peers) matrix(0, n, nr) else NULL
-
-  for (o in seq_len(n)) {
+  ## Point a program at DMU o. Separate from the loop so a rebuilt program is
+  ## aimed identically rather than approximately.
+  aim <- function(lp, o) {
     xo <- pmax(X[o, ], .DEA_CONSTANTS$MIN_POS)
     yo <- pmax(Y[o, ], .DEA_CONSTANTS$MIN_POS)
     ## The t column carries the DMU's own levels, and the objective row.
@@ -157,11 +160,19 @@ dea_sbm <- function(x, y, data = NULL,
     ## S^+ appears in the normalization row (1/(q y_ro)) and its balance row.
     for (r in seq_len(q))
       lpSolveAPI::set.column(lp, 1L + nr + p + r, c(1/(q * yo[r]), -1), c(1L, ro[r]))
+  }
 
-    st[o] <- solve(lp)
+  eff <- numeric(n); st <- integer(n)
+  sx <- matrix(NA_real_, n, p); sy <- matrix(NA_real_, n, q)
+  L  <- if (peers) matrix(0, n, nr) else NULL
+
+  for (o in seq_len(n)) {
+    aim(lp, o)
+    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l })
+    st[o] <- z$status
     if (!st[o] %in% c(0L, 1L)) { eff[o] <- NA_real_; next }
-    eff[o] <- lpSolveAPI::get.objective(lp)
-    v  <- lpSolveAPI::get.variables(lp)
+    eff[o] <- lpSolveAPI::get.objective(z$lp)
+    v  <- lpSolveAPI::get.variables(z$lp)
     tt <- max(v[1L], .DEA_CONSTANTS$MIN_POS)
     if (peers) L[o, ] <- v[1L + seq_len(nr)] / tt
     sx[o, ] <- v[1L + nr + seq_len(p)] / tt
@@ -191,7 +202,11 @@ dea_sbm <- function(x, y, data = NULL,
   sx <- matrix(NA_real_, n, p); sy <- matrix(NA_real_, n, q)
   L  <- if (peers) matrix(0, n, nr) else NULL
 
-  for (o in seq_len(n)) {
+  ## Point a program at DMU o. Separate from the loop so that a REBUILT program
+  ## is aimed identically -- see .lp_solve_retry(). This is the sweep the
+  ## rebuild was first observed to need outside the radial path: seeds 2 and 3
+  ## at n = 900 and n = 1600 each produce one DMU with lpSolve status 5.
+  aim <- function(lp, o) {
     xo <- pmax(X[o, ], .DEA_CONSTANTS$MIN_POS)
     yo <- pmax(Y[o, ], .DEA_CONSTANTS$MIN_POS)
     ## nr, not n: the objective spans the REFERENCE columns plus the slacks.
@@ -203,12 +218,17 @@ dea_sbm <- function(x, y, data = NULL,
     else                     obj[nr + p + seq_len(q)] <- 1/(q * yo)
     lpSolveAPI::set.objfn(lp, obj)
     lpSolveAPI::set.rhs(lp, c(X[o, ], Y[o, ]), seq_len(p + q))
+  }
 
-    st[o] <- solve(lp)
+  for (o in seq_len(n)) {
+    aim(lp, o)
+    r <- .lp_solve_retry(lp, function() {
+      l <- .lp_slack_build(XR, YR, rts)$lp; aim(l, o); l })
+    st[o] <- r$status
     if (!st[o] %in% c(0L, 1L)) { eff[o] <- NA_real_; next }
-    z <- lpSolveAPI::get.objective(lp)
+    z <- lpSolveAPI::get.objective(r$lp)
     eff[o] <- if (orientation == "in") 1 - z else 1/(1 + z)
-    v <- lpSolveAPI::get.variables(lp)
+    v <- lpSolveAPI::get.variables(r$lp)
     if (peers) L[o, ] <- v[seq_len(nr)]
     sx[o, ] <- v[nr + seq_len(p)]
     sy[o, ] <- v[nr + p + seq_len(q)]
