@@ -122,22 +122,33 @@ test_that("fitted() lands on the frontier for the additive model", {
 })
 
 
-test_that("an extreme column spread warns rather than failing quietly", {
+test_that("an extreme column spread warns, and the DMU is recovered not lost", {
   ## The unweighted measure is solved in the caller's units by design, so a
-  ## wide spread conditions the program badly. On this design one DMU fails
-  ## numerically outright -- which must be reported as a conditioning problem,
-  ## NOT as the point lying outside the technology.
+  ## wide spread conditions the program badly. On this design DMU 35 gives
+  ## lpSolve status 5 on the REUSED program.
+  ##
+  ## Until the retry was added it was reported NA and the run warned that it
+  ## had FAILED NUMERICALLY. That was a recoverable failure presented as an
+  ## unrecoverable one: the program solves on a fresh object, and the answer it
+  ## gives is right. Solved independently under four lpSolve scaling modes
+  ## (none/geometric/curtisreid/extreme) the objective is 8e-9 to 2.5e-8 --
+  ## zero to within the noise this spread produces -- and the DMU is efficient.
+  ##
+  ## What must NOT be lost is the conditioning warning itself. The user still
+  ## needs to know the measure is a poor choice at this spread; they simply do
+  ## not also lose a DMU over it.
   d <- toy(n = 40, p = 2, q = 1)
   xw <- d$x; xw[, 1] <- xw[, 1] * 1000
-  ## Two distinct warnings, and both matter: one says the measure is a poor
-  ## choice at this spread, the other says a specific DMU could not be solved.
   ww <- testthat::capture_warnings(f <- dea_add(xw, d$y, measure = "unweighted"))
   expect_true(any(grepl("span a factor", ww)))
-  expect_true(any(grepl("FAILED NUMERICALLY", ww)))
-  ## And the numerical failure is NOT reported as infeasibility -- that would
-  ## send the reader looking at their data instead of at the conditioning.
+  ## Recovered, not reported as a failure, and not reported as infeasibility --
+  ## that would send the reader looking at their data rather than the scaling.
+  expect_false(any(grepl("FAILED NUMERICALLY", ww)))
   expect_false(any(grepl("INFEASIBLE", ww)))
-  expect_true(any(is.na(f$eff)))
+  expect_false(any(is.na(f$eff)))
+  expect_true(all(f$status %in% c(0L, 1L)))
+  ## And the recovered value is the right one: zero objective, efficient.
+  expect_lt(abs(f$eff[35]), 1e-5)
   ## RAM normalizes the columns, so it is untroubled by the same data.
   expect_silent(g <- dea_add(xw, d$y, measure = "ram"))
   expect_true(all(is.finite(g$eff)))

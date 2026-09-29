@@ -89,9 +89,43 @@ dea_cross <- function(x, y, data = NULL,
   keep <- matrix(TRUE, nr, n)
   if (!self && d$self) diag(keep) <- FALSE
   Em <- E; Em[!keep] <- NA_real_
-  cross <- colMeans(Em, na.rm = TRUE)
-  spread <- apply(Em, 2L, function(z) diff(range(z, na.rm = TRUE)))
+
+  ## An appraisal can be missing for two reasons, and averaging with
+  ## na.rm = TRUE alone would hide both. A rater whose weights did not solve
+  ## contributes an NA ROW; a rated DMU whose v'x is zero for some rater --
+  ## every input zero, say -- takes an NA in that COLUMN.
+  ##
+  ## Silently dropping them does not give a missing answer, it gives a
+  ## PLAUSIBLE WRONG ONE: a mean over fewer raters than the panel, reported as
+  ## though the whole panel had spoken. And a DMU with no usable appraisal at
+  ## all came out as NaN with `spread` -Inf, explained only by base R's "no
+  ## non-missing arguments to max" -- which says nothing a reader could act on.
+  want <- colSums(keep)
+  have <- colSums(!is.na(Em))
+  cross <- rep(NA_real_, n)
+  cross[have > 0L] <- colMeans(Em[, have > 0L, drop = FALSE], na.rm = TRUE)
+  spread <- vapply(seq_len(n), function(j) {
+    z <- Em[, j]; z <- z[is.finite(z)]
+    if (length(z) == 0L) NA_real_ else diff(range(z))
+  }, numeric(1))
   names(cross) <- names(spread) <- d$dmu
+
+  if (any(have == 0L)) {
+    warning(sum(have == 0L), " of ", n, " rated DMU(s) received NO usable ",
+            "appraisal and are reported as NA. This happens when the weights ",
+            "of every rater value the DMU's inputs at zero -- most often ",
+            "because its inputs are all zero, so v'x is zero whatever v is, ",
+            "and the cross-efficiency ratio has no denominator. See ",
+            "`cross_matrix` for which appraisals are missing.", call. = FALSE)
+  }
+  if (any(have > 0L & have < want)) {
+    warning(sum(have > 0L & have < want), " of ", n, " rated DMU(s) were ",
+            "scored by FEWER raters than the panel holds, and their means are ",
+            "over the raters that did appraise them. The others are NA in ",
+            "`cross_matrix`, either because a rater's weights did not solve ",
+            "or because that rater values the DMU's inputs at zero.",
+            call. = FALSE)
+  }
 
   structure(list(
     eff = cross, model = "cross", rts = rts, secondary = secondary,

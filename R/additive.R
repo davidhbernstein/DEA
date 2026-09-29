@@ -158,14 +158,49 @@ dea_add <- function(x, y, data = NULL,
   sx <- matrix(NA_real_, n, p); sy <- matrix(NA_real_, n, q)
   L  <- if (peers) matrix(0, n, nr) else NULL
 
-  for (o in seq_len(n)) {
+  ## Point a program at DMU o. Factored out so the retry below repeats it
+  ## exactly: RAM and the unweighted model set their objective once outside the
+  ## loop, so a REBUILT program has to be given it again as well as the
+  ## right-hand side.
+  aim <- function(lp, o, fresh = FALSE) {
     if (identical(measure, "mip")) {
       xo <- pmax(X[o, ], .DEA_CONSTANTS$MIN_POS)
       yo <- pmax(Y[o, ], .DEA_CONSTANTS$MIN_POS)
       lpSolveAPI::set.objfn(lp, c(rep(0, nr), 1/((p + q) * xo), 1/((p + q) * yo)))
+    } else if (fresh) {
+      lpSolveAPI::set.objfn(lp, if (identical(measure, "ram"))
+        c(rep(0, nr), wx, wy) else c(rep(0, nr), rep(1, p + q)))
     }
     lpSolveAPI::set.rhs(lp, c(X[o, ], Y[o, ]), seq_len(p + q))
+  }
+
+  for (o in seq_len(n)) {
+    aim(lp, o)
     st[o] <- solve(lp)
+    ## RETRY ON A FRESH LP, for the reason set out at length in .dea_radial():
+    ## the object is reused across all n DMUs and carries basis and
+    ## factorisation state, which for some right-hand sides is bad enough that
+    ## the solve gives up. Measured here: one DMU of 1200 under vrs returned
+    ## status 5 on the reused object and status 0 on a fresh one, five times
+    ## out of five. Without this it was reported NA -- a recoverable failure
+    ## presented as an unrecoverable one.
+    ##
+    ## Infeasible (2) is NOT retried: that is an answer about the data.
+    if (!st[o] %in% c(0L, 1L, 2L)) {
+      S2 <- .lp_slack_build(XR, YR, rts)
+      aim(S2$lp, o, fresh = TRUE)
+      st[o] <- solve(S2$lp)
+      if (st[o] %in% c(0L, 1L)) lp2 <- S2$lp else lp2 <- NULL
+      if (!is.null(lp2)) {
+        z <- lpSolveAPI::get.objective(lp2)
+        eff[o] <- if (identical(measure, "unweighted")) z else 1 - z
+        v <- lpSolveAPI::get.variables(lp2)
+        if (peers) L[o, ] <- v[seq_len(nr)]
+        sx[o, ] <- v[nr + seq_len(p)]
+        sy[o, ] <- v[nr + p + seq_len(q)]
+        next
+      }
+    }
     if (!st[o] %in% c(0L, 1L)) { eff[o] <- NA_real_; next }
     z <- lpSolveAPI::get.objective(lp)
     ## RAM and MIP are normalized so that the objective is an inefficiency

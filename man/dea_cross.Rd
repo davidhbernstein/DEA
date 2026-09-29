@@ -37,7 +37,12 @@ fixed panel score newcomers.}
 \value{
 An object of class \code{"dea_cross"}, a list whose components include:
 \item{eff}{The cross-efficiency of each DMU: the mean of the appraisals it
-receives.}
+receives. \code{NA}, with a warning, for a DMU that receives no usable
+appraisal --- which happens when every rater's weights value its inputs at
+zero, most often because its inputs are all zero and the ratio has no
+denominator. A DMU appraised by only some of the panel is averaged over those
+raters, and that too is warned about rather than left to be inferred from
+\code{cross_matrix}.}
 \item{cross_matrix}{The \eqn{n_{ref} \times n} matrix \eqn{E}, one row per
 rater and one column per rated DMU. Its diagonal is the ordinary DEA score.}
 \item{own}{Each DMU's ordinary DEA score, or \code{NULL} when the rated DMUs
@@ -46,7 +51,8 @@ are not among the raters.}
 DMU's self-appraisal exceeds what its peers award it. Large means a DMU that
 looks efficient only under weights nobody else would choose.}
 \item{spread}{The range of appraisals each DMU receives -- a direct measure of
-how much the answer depends on whose weights are used.}
+how much the answer depends on whose weights are used. \code{NA} where
+\code{eff} is.}
 \item{v, u, u0}{The weights each rater used.}
 }
 \details{

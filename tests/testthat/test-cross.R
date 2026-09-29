@@ -88,3 +88,35 @@ test_that("the methods report what they should", {
   expect_identical(dim(m), c(30L, 4L))
   expect_true(all(m >= -1e-9))
 })
+
+test_that("a DMU with no usable appraisal is NA, not NaN, and says so", {
+  ## Every input zero means v'x is zero whatever v is, so the cross-efficiency
+  ## ratio has no denominator and every rater's appraisal of this DMU is
+  ## missing. That used to surface as eff = NaN and spread = -Inf, explained
+  ## only by base R's "no non-missing arguments to max" -- which tells the
+  ## reader nothing they can act on.
+  set.seed(3)
+  xr <- cbind(runif(12, 1, 3), runif(12, 1, 3)); yr <- cbind(runif(12, 1, 3))
+  xe <- rbind(c(2, 2), c(0, 0)); ye <- rbind(2, 1)
+
+  expect_warning(f <- dea_cross(xe, ye, xref = xr, yref = yr, rts = "crs",
+                                secondary = "benevolent"),
+                 "NO usable appraisal")
+  expect_true(is.na(f$eff[2]))
+  expect_true(is.na(f$spread[2]))
+  expect_false(is.nan(f$eff[2]))          ## NA, and specifically not NaN
+  expect_true(is.finite(f$eff[1]))        ## the ordinary DMU is untouched
+  expect_true(is.finite(f$spread[1]))
+})
+
+test_that("ordinary cross-efficiency is unchanged by the NA handling", {
+  ## The guard must not perturb the normal path: every DMU is appraised by the
+  ## whole panel, so no warning and no missing entries.
+  s <- dea_sim(20, p = 2, q = 1, seed = 4)
+  expect_silent(f <- dea_cross(s$x, s$y, rts = "crs", secondary = "benevolent"))
+  expect_false(any(is.na(f$eff)))
+  expect_true(all(is.finite(f$spread)))
+  ## The mean over a full column is exactly colMeans, which is what the old
+  ## code computed and what the new code must still compute.
+  expect_equal(unname(f$eff), unname(colMeans(f$cross_matrix)), tolerance = 1e-12)
+})

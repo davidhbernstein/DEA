@@ -111,6 +111,45 @@ dual that fails where the envelopment program solved is still reported.
 
 `?dea` now documents `mult_status`, which was returned but never described.
 
+## Three more bugs, from auditing every solve site
+
+The multiplier fix above was the fourth program that could fail and say
+nothing. That made the pattern worth chasing to the end rather than one more
+time, so every one of the package's ten linear-program solve sites was checked
+for the three things the earlier four were missing: the status recorded, a
+retry on a fresh program, and the failure reported.
+
+**`dea_ddf()` never reported an unsolved DMU.** The fifth instance, and
+reachable from ordinary code rather than a contrived program:
+`direction = "in"` holds the output direction at zero, so a DMU whose outputs
+exceed everything the reference set can produce has no feasible point at all.
+It returned `beta = NA` in silence. Established the same way as the free
+disposal bug in 1.0.3 --- by contrast on identical data, where `dea()` warned
+and `dea_ddf()` did not, with both reporting the same status vector.
+
+**The additive sweep lost a DMU it could have solved.** It reported failures
+but never retried them, and the failure is the same lpSolveAPI basis carryover
+fixed elsewhere in 1.0.2: one DMU of 1200 under variable returns gave status 5
+on the reused program and status 0 on a fresh one, five times out of five.
+
+This changes a documented behaviour. The unweighted measure at a 1000:1 column
+spread used to lose a DMU outright; it is now recovered, and the recovered
+answer is right --- solved independently under four `lpSolve` scaling modes the
+objective is 8e-9 to 2.5e-8, zero to within the noise that spread produces, and
+the DMU is efficient. The conditioning warning still fires. Users simply no
+longer lose a DMU on top of it.
+
+**`dea_cross()` returned `NaN` and `-Inf` for a DMU nobody could appraise.**
+Every rater's weights value an all-zero-input DMU at zero, so the
+cross-efficiency ratio has no denominator, and averaging with `na.rm = TRUE`
+turned that into `NaN` with `spread` of `-Inf` --- explained to the user only
+by base R's "no non-missing arguments to max". Both are now `NA` with a warning
+that says what happened. A DMU appraised by only *part* of the panel is now
+warned about too: that case produced not a missing answer but a plausible wrong
+one, a mean over fewer raters reported as though the whole panel had spoken.
+
+Suite 839 -> 857 assertions, none skipped.
+
 # DEA 1.0.2
 
 Two silent defects in the radial path, both in how solver failures were

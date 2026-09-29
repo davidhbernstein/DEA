@@ -67,33 +67,69 @@ dea_ddf <- function(x, y, data = NULL,
   Gs <- cbind(sweep(G[, seq_len(p), drop = FALSE], 2L, sc$sx, "/"),
               sweep(G[, p + seq_len(q), drop = FALSE], 2L, sc$sy, "/"))
 
+  ## Built as a function rather than inline so that it can be REBUILT. The
+  ## object is reused across all n DMUs and only the evaluated DMU's column and
+  ## right-hand side are rewritten -- that is where the speed comes from -- but
+  ## lpSolveAPI carries basis and factorisation state with it, and for some
+  ## right-hand sides that inherited state is bad enough that the solve gives
+  ## up. See the long note in .dea_radial(); a fresh object is the remedy.
   rr <- .rts_row(rts)
-  nrows <- p + q + (!is.null(rr))
-  lp <- lpSolveAPI::make.lp(nrows, nr + 1L)
-  lpSolveAPI::lp.control(lp, sense = "max", epsel = .DEA_CONSTANTS$LP_EPSEL,
-                         verbose = "neutral")
-  rts_one <- if (is.null(rr)) numeric(0) else 1
-  for (j in seq_len(nr)) lpSolveAPI::set.column(lp, j + 1L, c(XRs[j, ], YRs[j, ], rts_one))
-  lpSolveAPI::set.constr.type(lp, rep("<=", p), seq_len(p))
-  lpSolveAPI::set.constr.type(lp, rep(">=", q), p + seq_len(q))
-  if (!is.null(rr)) {
-    lpSolveAPI::set.constr.type(lp, rr, p + q + 1L)
-    lpSolveAPI::set.rhs(lp, 1, p + q + 1L)
+  build <- function() {
+    nrows <- p + q + (!is.null(rr))
+    lp <- lpSolveAPI::make.lp(nrows, nr + 1L)
+    lpSolveAPI::lp.control(lp, sense = "max", epsel = .DEA_CONSTANTS$LP_EPSEL,
+                           verbose = "neutral")
+    rts_one <- if (is.null(rr)) numeric(0) else 1
+    for (j in seq_len(nr)) lpSolveAPI::set.column(lp, j + 1L, c(XRs[j, ], YRs[j, ], rts_one))
+    lpSolveAPI::set.constr.type(lp, rep("<=", p), seq_len(p))
+    lpSolveAPI::set.constr.type(lp, rep(">=", q), p + seq_len(q))
+    if (!is.null(rr)) {
+      lpSolveAPI::set.constr.type(lp, rr, p + q + 1L)
+      lpSolveAPI::set.rhs(lp, 1, p + q + 1L)
+    }
+    lpSolveAPI::set.bounds(lp, lower = -.LP_INF, upper = .LP_INF, columns = 1L)
+    lp
   }
-  lpSolveAPI::set.bounds(lp, lower = -.LP_INF, upper = .LP_INF, columns = 1L)
+  lp <- build()
 
-  beta <- numeric(n); st <- integer(n)
-  L <- if (peers) matrix(0, n, nr) else NULL
-  for (o in seq_len(n)) {
+  ## Point the program at DMU o. Kept separate from the loop so the retry can
+  ## repeat it exactly rather than approximately.
+  aim <- function(lp, o) {
     lpSolveAPI::set.column(lp, 1L,
       c(1, Gs[o, seq_len(p)], -Gs[o, p + seq_len(q)]),
       c(0L, seq_len(p), p + seq_len(q)))
     lpSolveAPI::set.rhs(lp, c(Xs[o, ], Ys[o, ]), seq_len(p + q))
+  }
+
+  beta <- numeric(n); st <- integer(n)
+  L <- if (peers) matrix(0, n, nr) else NULL
+  for (o in seq_len(n)) {
+    aim(lp, o)
     st[o] <- solve(lp)
+    ## An INFEASIBLE program (2) is not retried: that is an answer about the
+    ## data, not a conditioning failure. Anything else is worth a fresh object.
+    if (!st[o] %in% c(0L, 1L, 2L)) {
+      lp2 <- build(); aim(lp2, o)
+      st[o] <- solve(lp2)
+      if (st[o] %in% c(0L, 1L)) {
+        beta[o] <- lpSolveAPI::get.objective(lp2)
+        if (peers) L[o, ] <- lpSolveAPI::get.variables(lp2)[-1L]
+        next
+      }
+    }
     if (!st[o] %in% c(0L, 1L)) { beta[o] <- NA_real_; next }
     beta[o] <- lpSolveAPI::get.objective(lp)
     if (peers) L[o, ] <- lpSolveAPI::get.variables(lp)[-1L]
   }
+
+  ## Report DMUs that did not solve. dea_ddf() recorded `status` and then said
+  ## nothing about it, so a failed program returned beta = NA silently -- the
+  ## same hole that dea() had before 1.0.2 and free disposal had before 1.0.3.
+  ## Reachable from ordinary code: direction = "in" holds g_y at zero, so a DMU
+  ## whose outputs exceed everything the reference set can produce has no
+  ## feasible point at all.
+  .dea_report_unsolved(st, n, d$self, "dea_ddf",
+                       requires = "some convex combination of the reference DMUs")
   beta[is.finite(beta) & abs(beta) < .DEA_CONSTANTS$TOL_EFF] <- 0
   names(beta) <- dmu
   if (!is.null(L)) { L[abs(L) < .DEA_CONSTANTS$TOL_LAMBDA] <- 0; dimnames(L) <- list(dmu, d$ref) }

@@ -166,3 +166,32 @@ test_that("the multiplier reporter warns on a dual failure the duality theorem f
   expect_silent(rep(c(0L, 5L), c(0L, 2L), 2L, super = TRUE))
   expect_silent(rep(c(0L, 1L), c(0L, 0L), 2L, super = FALSE))
 })
+
+## ---------------------------------------------------------------------------
+## The fifth of the same shape: dea_ddf() recorded `status` and reported
+## nothing, so a failed program returned beta = NA in silence. Found by
+## auditing every solve site for the three things the earlier four were missing
+## -- status recorded, retried on a fresh program, and reported.
+## ---------------------------------------------------------------------------
+
+test_that("dea_ddf() reports an unsolved DMU instead of returning NA quietly", {
+  ## direction = "in" holds g_y at zero, so outputs cannot expand: a DMU whose
+  ## output exceeds everything the reference set can produce has no feasible
+  ## point. Reachable from ordinary code, not a contrived program.
+  r <- dea_sim(30, p = 1, q = 1, seed = 2)
+  xe <- matrix(c(1.5, 1.5), ncol = 1)
+  ye <- matrix(c(0.5, max(r$y) * 3), ncol = 1)
+
+  expect_warning(f <- dea_ddf(xe, ye, direction = "in", rts = "vrs",
+                              xref = r$x, yref = r$y),
+                 "INFEASIBLE")
+  expect_identical(f$status, c(0L, 2L))
+  expect_true(is.na(f$beta[2]))
+
+  ## The contrast that made it a bug rather than a choice: dea() warns on the
+  ## same data, and beta = 1 - theta ties the two answers together.
+  expect_warning(g <- dea(xe, ye, rts = "vrs", orientation = "in",
+                          xref = r$x, yref = r$y), "INFEASIBLE")
+  expect_identical(g$status, f$status)
+  expect_equal(unname(f$beta[1]), 1 - unname(g$eff[1]), tolerance = 1e-9)
+})

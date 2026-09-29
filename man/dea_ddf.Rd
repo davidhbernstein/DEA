@@ -38,6 +38,13 @@ An object of class \code{"dea"} with \code{model = "ddf"}. Note that
 \strong{0 is on the frontier and larger is worse}, the reverse of every other
 model in this package. The direction actually used is returned in \code{g}.
 There are no second-stage slacks -- the projection is along \eqn{g}.
+
+A DMU whose program does not solve is reported as \code{NA} with a warning,
+and its \code{status} says which kind of failure it was: 2 for an infeasible
+program, anything other than 0 or 1 for a numerical one. Infeasibility is
+reachable in ordinary use --- \code{direction = "in"} holds \eqn{g_y} at zero,
+so a DMU whose outputs exceed everything the reference set can produce has no
+feasible point at all.
 }
 \details{
 \strong{Why not just use a radial measure.} Three reasons, in order of how
