@@ -2,6 +2,7 @@
 \alias{dea_cross}
 \alias{print.dea_cross}
 \alias{summary.dea_cross}
+\alias{plot.dea_cross}
 \alias{efficiency.dea_cross}
 \alias{nobs.dea_cross}
 \title{Cross-efficiency}
@@ -17,6 +18,8 @@ dea_cross(x, y, data = NULL,
           rts = c("crs", "vrs"),
           self = TRUE, scaling = TRUE,
           xref = NULL, yref = NULL, dataref = NULL)
+
+\method{plot}{dea_cross}(x, sort = TRUE, \dots)
 }
 \arguments{
 \item{x, y, data}{Inputs and outputs, in any of the forms accepted by
@@ -30,6 +33,9 @@ not the default.}
 \code{secondary = "none"}.}
 \item{self}{Whether a DMU's own appraisal counts in its mean. \code{FALSE}
 drops the diagonal, which is Doyle and Green's convention.}
+\item{sort}{For \code{plot}, order the DMUs by their cross-efficiency.
+\code{FALSE} keeps the data order.}
+\item{\dots}{Passed to the underlying plotting call.}
 \item{scaling, xref, yref, dataref}{As in \code{\link{dea}}. The reference set
 is the panel of \emph{raters}; separating it from \code{x}/\code{y} lets a
 fixed panel score newcomers.}

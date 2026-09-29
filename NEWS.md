@@ -182,6 +182,48 @@ Nothing else moved. On 800 DMUs the cost, revenue, profit and non-oriented
 slacks-based scores are bit-identical before and after; the only changed number
 in the package is the one DMU that used to be lost.
 
+## plot() now draws the object, on every class
+
+`plot.dea` was the only plot method, and what happened to the other five
+classes was worse than having none.
+
+`dea_price`, `dea_cross` and `dea_sim` all carry components named `x` and `y`
+--- the input and output matrices. R's generic therefore fell through to
+`plot.default`, which **found** them and silently drew the raw inputs against
+the raw outputs: a plausible-looking scatter with nothing to do with a price
+decomposition or a cross-efficiency ranking. `dea_rts` and `dea_boot` have no
+such components, so the same fall-through failed instead with *"'x' is a list,
+but does not have components 'x' and 'y'"* --- a true statement about
+`plot.default` and a baffling one about a returns-to-scale object.
+
+Five methods now draw what each object is for, and each returns the plotted
+data invisibly so it can be redrawn another way:
+
+* `plot.dea_boot` --- the standard caterpillar: DMUs sorted, interval as a
+  segment, bias-corrected estimate on it, and the raw score marked too, because
+  the distance between the two *is* the bias being corrected.
+* `plot.dea_rts` --- scale efficiency against `sum(lambda)` under constant
+  returns, coloured by class. That puts the classification and its own evidence
+  in one picture: the rule is that `sum(lambda)` below 1 is the
+  increasing-returns region, and an early version of this package had that
+  inverted.
+* `plot.dea_cross` --- the range of appraisals each DMU receives, with its
+  self-appraisal marked. The mean is what `eff` already reports; the spread is
+  what the matrix adds.
+* `plot.dea_price` --- technical against allocative efficiency, with contours
+  of constant overall efficiency taken from the data rather than a fixed
+  ladder, which would otherwise fall off the panel whenever efficiency is
+  confined near 1.
+* `plot.dea_sim` --- the sample under its true frontier for one input and one
+  output, and the distribution of true efficiency otherwise.
+
+All five handle the `NA`s these objects are documented to produce: an
+infeasible super-efficiency DMU, or a rated DMU that no rater could appraise.
+
+Found by measuring test coverage rather than by guesswork --- the package sits
+at 88%, and the print, summary and plot methods were most of what the suite
+never reached.
+
 # DEA 1.0.2
 
 Two silent defects in the radial path, both in how solver failures were

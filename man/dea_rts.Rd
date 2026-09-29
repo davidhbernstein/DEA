@@ -2,6 +2,7 @@
 \alias{dea_rts}
 \alias{print.dea_rts}
 \alias{summary.dea_rts}
+\alias{plot.dea_rts}
 \title{Scale efficiency and returns to scale}
 \description{
 Fit the constant-, variable- and non-increasing-returns technologies to the
@@ -15,6 +16,7 @@ dea_rts(x, y, data = NULL, orientation = c("in", "out"), tol = 1e-6,
 
 \method{print}{dea_rts}(x, \dots)
 \method{summary}{dea_rts}(object, \dots)
+\method{plot}{dea_rts}(x, \dots)
 }
 \arguments{
 \item{x, y, data}{Inputs and outputs, in any of the forms accepted by

@@ -479,3 +479,168 @@ nobs.dea_cross <- function(object, ...) object$n
              lambda = L[idx],
              row.names = NULL, stringsAsFactors = FALSE)
 }
+
+## ---------------------------------------------------------------------------
+## plot() for the classes that are not "dea".
+##
+## WHY THESE EXIST. Until 1.0.3 `plot.dea` was the only plot method, and what
+## happened to the other five classes was worse than nothing.
+##
+## `dea_price`, `dea_cross` and `dea_sim` all carry components named `x` and
+## `y` -- the input and output matrices. R's plot generic therefore fell
+## through to plot.default(), which FOUND those components and silently drew
+## the raw inputs against the raw outputs: a plausible-looking scatter that
+## says nothing whatever about cross-efficiency, or about a price
+## decomposition. `dea_rts` and `dea_boot` have no such components, so the same
+## fall-through instead failed with "'x' is a list, but does not have
+## components 'x' and 'y'", which is a true statement about plot.default and a
+## baffling one about a returns-to-scale object.
+##
+## Each method below draws the thing the object is actually for, and returns
+## the plotted data invisibly so a caller can redraw it their own way.
+## ---------------------------------------------------------------------------
+
+## The standard presentation of bootstrap intervals: one row per DMU, sorted,
+## with the interval as a segment and the bias-corrected point on it. The raw
+## score is drawn too, because the DISTANCE between the two is the bias being
+## corrected and is the thing worth looking at.
+plot.dea_boot <- function(x, sort = TRUE, ...) {
+  tb <- x$table
+  ok <- is.finite(tb$bias_corrected) & is.finite(tb$ci_lower) & is.finite(tb$ci_upper)
+  tb <- tb[ok, , drop = FALSE]
+  if (nrow(tb) == 0L) stop("No DMU has a finite interval to plot.", call. = FALSE)
+  if (isTRUE(sort)) tb <- tb[order(tb$bias_corrected), , drop = FALSE]
+  i <- seq_len(nrow(tb))
+  rng <- range(c(tb$ci_lower, tb$ci_upper, tb$eff), finite = TRUE)
+  graphics::plot(tb$bias_corrected, i, xlim = rng, type = "n",
+                 xlab = if (x$orientation == "in") "efficiency (theta)" else "efficiency (phi)",
+                 ylab = "DMU, sorted", main = paste0("Simar-Wilson bootstrap, B = ", x$B),
+                 ...)
+  graphics::segments(tb$ci_lower, i, tb$ci_upper, i, col = "grey70")
+  graphics::points(tb$eff, i, pch = 4, cex = 0.5, col = "grey35")
+  graphics::points(tb$bias_corrected, i, pch = 16, cex = 0.6, col = "steelblue")
+  graphics::abline(v = 1, lwd = 2, col = "grey20", lty = 2)
+  graphics::legend("bottomright", bty = "n",
+                   pch = c(4, 16, NA), lty = c(NA, NA, 1),
+                   col = c("grey35", "steelblue", "grey70"),
+                   legend = c("raw", "bias corrected",
+                              paste0(round(100 * (1 - x$alpha)), "% interval")))
+  invisible(tb)
+}
+
+## Scale efficiency against the criterion that CLASSIFIES it. The rule is that
+## sum(lambda) under constant returns is below 1 in the increasing-returns
+## region and above 1 in the decreasing one, so this draws the classification
+## and its evidence in the same picture -- which is the arrangement that would
+## have made the inverted IRS/DRS rule of an early version visible at a glance
+## rather than only through the cross-check that caught it. See ?dea_rts.
+plot.dea_rts <- function(x, ...) {
+  tb <- x$table
+  ok <- is.finite(tb$scale_eff) & is.finite(tb$sum_lambda_crs)
+  tb <- tb[ok, , drop = FALSE]
+  if (nrow(tb) == 0L) stop("No DMU has a finite scale efficiency to plot.", call. = FALSE)
+  cls <- factor(tb$rts, levels = c("irs", "crs", "drs"))
+  col <- c(irs = "steelblue", crs = "grey20", drs = "darkorange")[as.character(cls)]
+  graphics::plot(tb$sum_lambda_crs, tb$scale_eff, pch = 16, cex = 0.7, col = col,
+                 xlab = "sum(lambda), constant returns",
+                 ylab = "scale efficiency",
+                 main = paste0("Returns to scale (",
+                               if (x$orientation == "in") "input" else "output",
+                               " orientation)"), ...)
+  graphics::abline(v = 1, lty = 2, col = "grey50")
+  graphics::abline(h = 1, lty = 2, col = "grey50")
+  graphics::legend("bottomright", bty = "n", pch = 16,
+                   col = c("steelblue", "grey20", "darkorange"),
+                   legend = paste0(c("irs", "crs", "drs"), " (",
+                                   tabulate(cls, 3L), ")"))
+  invisible(tb[, c("dmu", "sum_lambda_crs", "scale_eff", "rts")])
+}
+
+## The spread of appraisals each DMU receives. The mean alone is what `eff`
+## already reports; what the matrix adds is how much that mean depends on whose
+## weights were used, so the segment from the least to the most generous
+## appraisal is the point of the plot. The self-appraisal is marked where there
+## is one, since the gap between it and the mean is the maverick index.
+plot.dea_cross <- function(x, sort = TRUE, ...) {
+  E <- x$cross_matrix
+  lo <- apply(E, 2L, function(z) if (all(is.na(z))) NA_real_ else min(z, na.rm = TRUE))
+  hi <- apply(E, 2L, function(z) if (all(is.na(z))) NA_real_ else max(z, na.rm = TRUE))
+  ok <- is.finite(x$eff) & is.finite(lo) & is.finite(hi)
+  if (!any(ok)) stop("No DMU has a finite appraisal to plot.", call. = FALSE)
+  o <- which(ok)
+  if (isTRUE(sort)) o <- o[order(x$eff[o])]
+  i <- seq_along(o)
+  own <- if (is.null(x$own)) NULL else x$own[o]
+  rng <- range(c(lo[o], hi[o], own), finite = TRUE)
+  graphics::plot(x$eff[o], i, xlim = rng, type = "n",
+                 xlab = "appraisal", ylab = "DMU, sorted",
+                 main = paste0("Cross-efficiency (", x$secondary, ")"), ...)
+  graphics::segments(lo[o], i, hi[o], i, col = "grey70")
+  if (!is.null(own)) graphics::points(own, i, pch = 4, cex = 0.5, col = "grey35")
+  graphics::points(x$eff[o], i, pch = 16, cex = 0.6, col = "steelblue")
+  graphics::legend("bottomright", bty = "n",
+                   pch = c(16, if (!is.null(own)) 4 else NA, NA),
+                   lty = c(NA, NA, 1),
+                   col = c("steelblue", "grey35", "grey70"),
+                   legend = c("cross-efficiency",
+                              if (!is.null(own)) "self-appraisal" else NA,
+                              "range of appraisals"))
+  invisible(data.frame(dmu = x$dmu[o], cross = x$eff[o],
+                       lo = lo[o], hi = hi[o], row.names = NULL))
+}
+
+## The decomposition, not the score. Overall efficiency is the product of the
+## technical and allocative parts, so plotting one against the other puts each
+## DMU at the point whose coordinates multiply to its `eff` -- and the contours
+## of constant overall efficiency are the hyperbolas drawn behind them.
+plot.dea_price <- function(x, ...) {
+  ok <- is.finite(x$technical) & is.finite(x$allocative)
+  if (!any(ok)) stop("No DMU has a finite decomposition to plot.", call. = FALSE)
+  tec <- x$technical[ok]; all_ <- x$allocative[ok]
+  graphics::plot(tec, all_, pch = 16, cex = 0.7, col = "grey35",
+                 xlab = "technical efficiency", ylab = "allocative efficiency",
+                 main = paste0(toupper(substring(x$model, 1, 1)),
+                               substring(x$model, 2), " efficiency decomposition"),
+                 xlim = range(c(tec, 1)), ylim = range(c(all_, 1)), ...)
+  ## Contour levels come from the DATA, not from a fixed ladder: overall
+  ## efficiency is often confined to a narrow band near 1, and fixed levels
+  ## then put every contour off the panel or crowd them into a corner.
+  ov <- tec * all_
+  ks <- unique(stats::quantile(ov[is.finite(ov)], c(.1, .3, .5, .7, .9),
+                               names = FALSE))
+  for (k in ks) {
+    g <- seq(max(k, min(tec)), 1, length.out = 200)
+    graphics::lines(g, k / g, col = "grey85")
+  }
+  graphics::abline(v = 1, h = 1, lty = 2, col = "grey50")
+  graphics::legend("bottomleft", bty = "n", lty = 1, col = "grey85",
+                   legend = "constant overall efficiency")
+  invisible(data.frame(dmu = x$dmu[ok], technical = tec, allocative = all_,
+                       overall = x$eff[ok], row.names = NULL))
+}
+
+## The design, with the truth drawn in -- which is the whole reason dea_sim()
+## exists. With one input and one output the frontier is a curve and the
+## sample sits under it; otherwise the informative picture is the distribution
+## of the true efficiency the design generated.
+plot.dea_sim <- function(x, ...) {
+  d <- x$design
+  if (d$p == 1L && d$q == 1L) {
+    xg <- seq(d$x_range[1], d$x_range[2], length.out = 400)
+    graphics::plot(x$x[, 1L], x$y[, 1L], pch = 16, cex = 0.7, col = "grey45",
+                   xlab = "x", ylab = "y",
+                   main = paste0("dea_sim(): n = ", d$n, ", returns = ", d$returns),
+                   ...)
+    graphics::lines(xg, xg^d$returns, lwd = 2, col = "steelblue")
+    graphics::legend("bottomright", bty = "n", pch = c(16, NA), lty = c(NA, 1),
+                     lwd = c(NA, 2), col = c("grey45", "steelblue"),
+                     legend = c("observed", "true frontier"))
+    return(invisible(data.frame(x = x$x[, 1L], y = x$y[, 1L], row.names = NULL)))
+  }
+  graphics::hist(x$theta, breaks = "FD", col = "grey85", border = "white",
+                 xlab = "true input efficiency (theta)",
+                 main = paste0("dea_sim(): p = ", d$p, ", q = ", d$q,
+                               ", returns = ", d$returns), ...)
+  graphics::abline(v = 1, lwd = 2, col = "steelblue")
+  invisible(x$theta)
+}

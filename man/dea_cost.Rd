@@ -4,6 +4,7 @@
 \alias{dea_profit}
 \alias{print.dea_price}
 \alias{summary.dea_price}
+\alias{plot.dea_price}
 \alias{efficiency.dea_price}
 \alias{fitted.dea_price}
 \alias{peers.dea_price}
@@ -31,6 +32,8 @@ dea_profit(x, y, w, r, data = NULL,
            rts = c("vrs", "nirs"),
            peers = TRUE, scaling = TRUE,
            xref = NULL, yref = NULL, dataref = NULL)
+
+\method{plot}{dea_price}(x, \dots)
 }
 \arguments{
 \item{x, y, data}{Inputs and outputs, in any of the forms accepted by
@@ -47,6 +50,7 @@ accepts only \code{"vrs"} and \code{"nirs"}; see \strong{Details}.}
 \item{direction}{For \code{dea_profit()}, the direction \eqn{g} the profit gap
 is normalized by, in the forms \code{\link{dea_ddf}} accepts.}
 \item{peers, scaling, xref, yref, dataref}{As in \code{\link{dea}}.}
+\item{\dots}{Passed to the underlying plotting call.}
 }
 \value{
 An object of class \code{"dea_price"}, a list whose components include:

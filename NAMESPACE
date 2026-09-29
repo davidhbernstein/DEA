@@ -11,7 +11,8 @@ import("lpSolveAPI")
 importFrom("stats", "IQR", "bw.SJ", "bw.nrd0", "bw.ucv", "fitted",
                     "model.matrix", "nobs", "quantile", "rexp", "rnorm",
                     "runif", "sd", "terms")
-importFrom("graphics", "abline", "hist", "legend", "lines", "par")
+importFrom("graphics", "abline", "hist", "legend", "lines", "par",
+                      "points", "segments")
 importFrom("utils", "flush.console", "head")
 
 S3method(print,   dea)
@@ -43,3 +44,9 @@ S3method(summary, dea_rts)
 S3method(print,   dea_boot)
 S3method(summary, dea_boot)
 S3method(print,   dea_sim)
+
+S3method(plot,    dea_boot)
+S3method(plot,    dea_rts)
+S3method(plot,    dea_cross)
+S3method(plot,    dea_price)
+S3method(plot,    dea_sim)

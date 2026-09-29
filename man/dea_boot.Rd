@@ -2,6 +2,7 @@
 \alias{dea_boot}
 \alias{print.dea_boot}
 \alias{summary.dea_boot}
+\alias{plot.dea_boot}
 \title{Bias correction and confidence intervals by the Simar-Wilson bootstrap}
 \description{
 The smoothed homogeneous bootstrap of Simar and Wilson (1998): bias-corrected
@@ -14,6 +15,7 @@ dea_boot(object, B = 2000, alpha = 0.05,
 
 \method{print}{dea_boot}(x, \dots)
 \method{summary}{dea_boot}(object, \dots)
+\method{plot}{dea_boot}(x, sort = TRUE, \dots)
 }
 \arguments{
 \item{object}{A fit from \code{\link{dea}}, scored against its own sample
@@ -33,6 +35,8 @@ when this exceeds 1. Not available on Windows; a request there runs serially
 with a message.}
 \item{progress}{Print a counter while running serially.}
 \item{x}{An object of class \code{"dea_boot"}.}
+\item{sort}{For \code{plot}, order the DMUs by their bias-corrected
+estimate. \code{FALSE} keeps the data order.}
 \item{\dots}{Ignored.}
 }
 \value{

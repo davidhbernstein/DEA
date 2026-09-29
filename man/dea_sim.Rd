@@ -1,6 +1,7 @@
 \name{dea_sim}
 \alias{dea_sim}
 \alias{print.dea_sim}
+\alias{plot.dea_sim}
 \alias{dea_rate}
 \title{Simulate a technology with known efficiency, and the rate it can be
 estimated at}
@@ -19,6 +20,7 @@ dea_rate(p, q, rts = c("vrs", "crs", "nirs", "ndrs", "fdh"),
          what = c("mse", "estimator"))
 
 \method{print}{dea_sim}(x, \dots)
+\method{plot}{dea_sim}(x, \dots)
 }
 \arguments{
 \item{n}{Number of DMUs.}
