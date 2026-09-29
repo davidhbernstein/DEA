@@ -220,9 +220,13 @@ data invisibly so it can be redrawn another way:
 All five handle the `NA`s these objects are documented to produce: an
 infeasible super-efficiency DMU, or a rated DMU that no rater could appraise.
 
-Found by measuring test coverage rather than by guesswork --- the package sits
-at 88%, and the print, summary and plot methods were most of what the suite
-never reached.
+`print` and `summary` are now tested on every class too, and on the `NA` shapes
+the estimators are documented to produce, along with all four bootstrap
+bandwidth rules --- only the default had ever been exercised.
+
+Found by measuring test coverage rather than by guesswork: the methods were
+most of what the suite never reached. Coverage 88% to **93%**, with `R/rts.R`
+and `R/sim.R` going from 66% and 82% to complete.
 
 # DEA 1.0.2
 

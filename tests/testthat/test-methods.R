@@ -166,3 +166,70 @@ test_that("plot() survives the NA cases these objects are documented to produce"
   skip_if(!any(is.na(f$eff)), "no infeasible super-efficiency DMU on this sample")
   expect_silent(draw(plot(f)))
 })
+
+test_that("print() and summary() work on every class, including with NAs", {
+  ## These are user-facing and were the largest untested surface in the
+  ## package. The assertions are deliberately weak -- that the method runs and
+  ## says something -- because what is being guarded against is a method that
+  ## errors on a shape the estimators are documented to produce, not the exact
+  ## wording of its output.
+  d  <- toy(n = 30, p = 2, q = 2, returns = 0.9, seed = 5)
+  pw <- matrix(seq(1, 2, length.out = 60), 30, 2)
+  fit <- dea(d$x, d$y, rts = "vrs")
+
+  objs <- list(
+    dea      = fit,
+    rts      = dea_rts(d$x, d$y),
+    sim      = dea_sim(20, p = 2, q = 2, returns = 0.9, seed = 5),
+    sim11    = dea_sim(20, p = 1, q = 1, returns = 0.9, seed = 5),
+    cost     = dea_cost(d$x, d$y, pw),
+    revenue  = dea_revenue(d$x, d$y, pw),
+    cross    = dea_cross(d$x, d$y, rts = "crs"),
+    boot     = suppressWarnings(dea_boot(fit, B = 20, seed = 1, progress = FALSE)),
+    sbm      = dea_sbm(d$x, d$y),
+    add      = dea_add(d$x, d$y),
+    ddf      = dea_ddf(d$x, d$y))
+
+  for (nm in names(objs)) {
+    o <- objs[[nm]]
+    expect_gt(length(capture.output(print(o))), 0L)
+    if (!is.null(utils::getS3method("summary", class(o)[1], optional = TRUE))) {
+      expect_gt(length(capture.output(summary(o))), 0L)
+    }
+  }
+
+  ## And on the documented NA shapes. A super-efficiency fit under vrs returns
+  ## NA for DMUs with no dominating peer; a directional fit scored against an
+  ## external reference set can be infeasible.
+  sup <- suppressWarnings(dea(d$x, d$y, rts = "vrs", super = TRUE))
+  expect_gt(length(capture.output(print(sup))), 0L)
+  expect_gt(length(capture.output(summary(sup))), 0L)
+
+  r  <- dea_sim(30, p = 1, q = 1, seed = 2)
+  xe <- matrix(c(1.5, 1.5), ncol = 1)
+  ye <- matrix(c(0.5, max(r$y) * 3), ncol = 1)
+  gd <- suppressWarnings(dea_ddf(xe, ye, direction = "in", rts = "vrs",
+                                 xref = r$x, yref = r$y))
+  expect_true(any(is.na(gd$beta)))
+  expect_gt(length(capture.output(print(gd))), 0L)
+  expect_gt(length(capture.output(summary(gd))), 0L)
+})
+
+test_that("the bandwidth rules all run and give a positive bandwidth", {
+  ## bw is offered as four rules and a number, and only the default was ever
+  ## exercised. They disagree by design -- the reflected density is bimodal
+  ## enough that a normal reference oversmooths it -- so the check is that each
+  ## produces a usable bandwidth, not that they agree.
+  d <- toy(n = 30, p = 1, q = 1, seed = 7)
+  fit <- dea(d$x, d$y, rts = "vrs")
+  hs <- vapply(c("silverman", "nrd0", "ucv", "sj"), function(rule) {
+    b <- suppressWarnings(dea_boot(fit, B = 10, seed = 1, bw = rule,
+                                   progress = FALSE))
+    b$bw
+  }, numeric(1))
+  expect_true(all(is.finite(hs) & hs > 0))
+  ## A number is taken as the bandwidth itself.
+  b <- suppressWarnings(dea_boot(fit, B = 10, seed = 1, bw = 0.05, progress = FALSE))
+  expect_equal(b$bw, 0.05)
+  expect_error(dea_boot(fit, B = 10, bw = -1), "positive")
+})
