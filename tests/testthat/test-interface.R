@@ -96,6 +96,6 @@ test_that("every model works when the reference set is a DIFFERENT SIZE", {
     expect_length(f$eff, 12L)
     expect_equal(dim(f$lambda), c(12L, 50L))
     ## Peers are drawn from the reference set, never from the evaluated one.
-    expect_setequal(colnames(f$lambda), ref$data |> nrow() |> seq_len() |> as.character())
+    expect_setequal(colnames(f$lambda), as.character(seq_len(nrow(ref$data))))
   }
 })
