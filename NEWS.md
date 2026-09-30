@@ -1,5 +1,62 @@
 # DEA 1.0.3
 
+## Panel data, and the Malmquist productivity index
+
+`dea_panel()` and `dea_malmquist()`. The index is Fare, Grosskopf, Norris and
+Zhang (1994), computed for every pair of consecutive periods, decomposed into
+efficiency change and technical change, and efficiency change further into a
+pure and a scale part.
+
+**The panel is its own object on purpose.** It is the prerequisite for four
+things rather than one — this index, window analysis, the Malmquist-Luenberger
+index and the Hicks-Moorsteen family — and an interface designed around
+whichever arrives first ends up with a `period` argument that means something
+slightly different in each. It takes long format: one row per DMU per period,
+`id` and `period` given as vectors, column names or formulas, exactly as `x`
+and `y` already are.
+
+**The period order is data, not a guess.** A factor's levels are honoured as
+given; anything else is sorted, which is right for numbers and ISO-like dates
+and wrong for `"Q1"`, `"Q10"`, `"Q2"`. Reversing the order inverts every index
+built on the panel, so the object prints the order it settled on, and a test
+asserts that reversing it really does invert the result rather than being
+cosmetic.
+
+**An unbalanced panel is an ordinary case.** Each period pair uses the DMUs
+observed in both, and `summary()` reports how many that is and how many
+observations went unmatched.
+
+**The four distance functions are named observation-then-technology.** `d_tf`
+is the to-period observation on the from-period technology. Each is an ordinary
+`dea()` fit with `xref`/`yref` pointing at the other period — the mixed terms
+are the reason that separation exists — and the naming is spelled out because
+swapping the two mixed terms replaces efficiency change with its reciprocal and
+nothing errors.
+
+**A convention the field is split on, settled by checking two packages rather
+than one.** This package follows Fare et al.: the index is built from Shephard
+distance functions, so `M > 1` is growth whichever side it is measured from.
+`productivity::malm()` agrees in both orientations. `Benchmarking::malmq()`
+builds the index from the native scale of each orientation instead, so **its
+output-oriented index is the reciprocal of this one**. Neither is wrong; a
+number copied between them without checking is. `malmquist_productivity.csv`
+pins the values, and `tools/make_reference_values.R` asserts both the agreement
+and the reciprocal — including that the two are not merely equal, so that the
+note stops being true loudly rather than quietly.
+
+**The default is `rts = "crs"`, and that is not laziness.** The mixed distance
+functions can be *infeasible* under variable returns, because a convex hull
+cannot extrapolate to a point outside it while a cone can always be scaled to
+reach one. `"vrs"` is allowed; the infeasible terms are `NA` and the count is
+reported per period pair.
+
+**The pure/scale split is an identity, and is tested as more than one.**
+`EC = PEC * SEC` follows by cancellation, so checking that product establishes
+nothing — it cannot fail. The test compares each piece against the same
+quantity computed from independent variable- and constant-returns fits. The
+split is also refused outside `"crs"`, where it would be a column of ones under
+`"vrs"` or some other decomposition of some other index under `"nirs"`/`"ndrs"`.
+
 ## The range directional model, and the DDF's first cross-package check
 
 `dea_ddf(direction = "range")` is the range directional model of Portela,

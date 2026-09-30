@@ -19,7 +19,8 @@ tiny_crs_in <- (tiny$y[, 1] / tiny$x[, 1]) / 0.8
 ## ---------------------------------------------------------------------------
 ## Reference values from independent implementations.
 ##
-## `reference/*.csv` holds what Benchmarking 0.33 and DJL 3.9 computed on these
+## `reference/*.csv` holds what Benchmarking 0.33, DJL 3.9 and productivity
+## 1.1.0 computed on these
 ## same fixtures, recorded once by ../../tools/make_reference_values.R. The
 ## comparison is against those recorded numbers rather than against a live call,
 ## for three reasons set out in full in that script:

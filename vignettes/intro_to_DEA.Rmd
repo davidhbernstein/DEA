@@ -121,6 +121,23 @@ shifted <- dea_ddf(sim$x - 3, sim$y - 1, direction = "range", rts = "vrs")
 max(abs(shifted$beta - rdm$beta))
 ```
 
+## Productivity over time
+
+With a panel — one row per DMU per period — `dea_malmquist()` measures how much
+of a change in productivity is the DMU catching up to the frontier and how much
+is the frontier itself moving.
+
+```{r}
+n <- nrow(sim$x)
+later <- dea_sim(n, p = 2, q = 1, returns = 0.9, seed = 2)
+m <- dea_malmquist(rbind(sim$x, later$x * 0.95), rbind(sim$y, later$y * 1.08),
+                   id = rep(seq_len(n), 2), period = rep(c(2023, 2024), each = n))
+m
+```
+
+Above 1 is growth in every column, in both orientations. `effch` is catching
+up, `techch` is the frontier moving, and their product is the index.
+
 ## Scale
 
 ```{r}

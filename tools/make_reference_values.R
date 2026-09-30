@@ -149,7 +149,9 @@ toy_ <- function(n, p, q, seed, returns = 1) {
 }
 
 cat("Benchmarking ", as.character(packageVersion("Benchmarking")),
-    " / DJL ", as.character(packageVersion("DJL")), "\n", sep = "")
+    " / DJL ", as.character(packageVersion("DJL")),
+    " / productivity ", as.character(packageVersion("productivity")),
+    "\n", sep = "")
 
 ## ---------------------------------------------------------------------------
 ## THIS SCRIPT IS THE LIVE CROSS-PACKAGE CHECK.
@@ -236,6 +238,70 @@ for (rts in c("crs", "vrs")) for (ori in c("none", "in", "out")) {
                                           stringsAsFactors = FALSE)
 }
 wr(do.call(rbind, rows), "sbm_DJL.csv")
+
+## --- the Malmquist index, against TWO packages, and a convention they split on
+## Two references rather than one, because they DISAGREE and the disagreement
+## is the thing that had to be settled.
+##
+##   * Benchmarking::malmq() reports its four distances on the native scale of
+##     the orientation -- theta input-oriented, phi output-oriented -- and
+##     builds the index from them directly. So its OUTPUT-oriented index is the
+##     RECIPROCAL of the one below, and under its convention "greater than 1"
+##     means growth on inputs and decline on outputs.
+##   * productivity::malm() agrees with this package in BOTH orientations.
+##
+## The convention here is Fare, Grosskopf, Norris and Zhang's: the index is
+## built from Shephard distance functions, so M > 1 is productivity growth
+## whichever side it is measured from. Every score is converted to the common
+## (0, 1] scale once (phi -> 1/phi) before any ratio is taken.
+##
+## What is pinned is this package's convention, checked against BOTH packages:
+## Benchmarking exactly on input and reciprocally on output, productivity
+## exactly on both. A single reference could not have shown that the
+## disagreement is a convention rather than an error.
+d0 <- toy_(20, 2, 1, 21)
+d1 <- toy_(20, 2, 1, 22)
+d1$x <- d1$x * 0.92; d1$y <- d1$y * 1.12          # a frontier that moves
+pid <- seq_len(20)
+pX <- rbind(d0$x, d1$x); pY <- rbind(d0$y, d1$y)
+pdf_ <- data.frame(id = rep(pid, 2L), t = rep(1:2, each = 20L),
+                   x1 = pX[, 1], x2 = pX[, 2], y1 = pY[, 1])
+rows <- list()
+for (ori in c("in", "out")) {
+  ours <- dea_malmquist(pX, pY, rep(pid, 2L), rep(1:2, each = 20L),
+                        rts = "crs", orientation = ori)
+  bm <- Benchmarking::malmq(d0$x, d0$y, pid, d1$x, d1$y, pid,
+                            RTS = "crs", ORIENTATION = ori)
+  flip <- if (identical(ori, "out")) function(v) 1 / v else identity
+  .agree(ours$table$malmquist, flip(bm$m),  1e-7, paste("malmquist M ", ori, "(Benchmarking)"))
+  .agree(ours$table$effch,     flip(bm$ec), 1e-7, paste("malmquist EC", ori, "(Benchmarking)"))
+  .agree(ours$table$techch,    flip(bm$tc), 1e-7, paste("malmquist TC", ori, "(Benchmarking)"))
+
+  pm <- suppressMessages(
+    productivity::malm(pdf_, "id", "t", c("x1", "x2"), "y1",
+                       rts = "crs", orientation = ori))
+  ch <- pm$Changes[match(ours$table$id, pm$Changes$id), ]
+  .agree(ours$table$malmquist, ch$malmquist, 1e-7, paste("malmquist M ", ori, "(productivity)"))
+  .agree(ours$table$effch,     ch$effch,     1e-7, paste("malmquist EC", ori, "(productivity)"))
+  .agree(ours$table$techch,    ch$tech,      1e-7, paste("malmquist TC", ori, "(productivity)"))
+
+  rows[[length(rows) + 1L]] <- data.frame(
+    orientation = ori, id = ours$table$id,
+    malmquist = as.numeric(ch$malmquist), effch = as.numeric(ch$effch),
+    techch = as.numeric(ch$tech), stringsAsFactors = FALSE)
+}
+## And that Benchmarking really does invert on output rather than merely
+## differ: assert the reciprocal holds and that the two are NOT equal.
+{
+  o <- dea_malmquist(pX, pY, rep(pid, 2L), rep(1:2, each = 20L),
+                     rts = "crs", orientation = "out")
+  bm <- Benchmarking::malmq(d0$x, d0$y, pid, d1$x, d1$y, pid,
+                            RTS = "crs", ORIENTATION = "out")
+  if (max(abs(o$table$malmquist - bm$m)) < 0.05)
+    stop("Benchmarking's output-oriented Malmquist no longer differs from ",
+         "this one; the convention note in R/malmquist.R needs rechecking.")
+}
+wr(do.call(rbind, rows), "malmquist_productivity.csv")
 
 ## --- directional distance, four directions x four technologies --------------
 ## The DDF had no cross-package reference at all until now, which is the one

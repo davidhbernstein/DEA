@@ -18,6 +18,14 @@ result object:
   \item{\code{\link{dea_rts}}}{scale efficiency and the returns-to-scale
   classification.}
 }
+Over time, on a long-format panel:
+\describe{
+  \item{\code{\link{dea_panel}}}{one row per DMU per period, with the period
+  order taken from the data rather than guessed.}
+  \item{\code{\link{dea_malmquist}}}{the Malmquist productivity index of
+  Fare, Grosskopf, Norris and Zhang (1994), split into efficiency change and
+  technical change, and efficiency change into pure and scale parts.}
+}
 When prices are known, efficiency splits into a technical part and a part that
 is about buying the wrong mix at those prices:
 \describe{
@@ -65,6 +73,11 @@ summary(fit)
 dea_sbm(sim$x, sim$y, rts = "vrs")
 dea_ddf(sim$x, sim$y, direction = "both", rts = "vrs")
 dea_rts(sim$x, sim$y)
+
+## Productivity over time.
+later <- dea_sim(100, p = 2, q = 1, seed = 2)
+dea_malmquist(rbind(sim$x, later$x * 0.95), rbind(sim$y, later$y * 1.08),
+              id = rep(1:100, 2), period = rep(1:2, each = 100))
 
 ## With prices: on the frontier, but at the wrong point on it?
 dea_cost(sim$x, sim$y, w = c(1.2, 0.8), rts = "crs")
