@@ -49,6 +49,9 @@ and, because a DEA score is an estimate and not a measurement,
 \describe{
   \item{\code{\link{dea_boot}}}{bias correction and confidence intervals by the
   smoothed homogeneous bootstrap of Simar and Wilson (1998).}
+  \item{\code{\link{dea_reg}}}{the two-stage regression of Simar and Wilson
+  (2007), for when efficiency is to be explained by covariates -- the place
+  applied DEA most often goes wrong.}
   \item{\code{\link{dea_rate}}}{the rate at which any of this can converge,
   which depends on the number of inputs and outputs and is never
   root-\eqn{n}.}

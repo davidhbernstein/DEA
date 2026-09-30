@@ -1,5 +1,63 @@
 # DEA 1.0.3
 
+## Two-stage efficiency regression, done the way Simar and Wilson say to
+
+`dea_reg()`, implementing Algorithms #1 and #2 of Simar and Wilson (2007).
+Regressing DEA scores on covariates is one of the most common things done with
+DEA and one of the most common things done wrong.
+
+**Why not OLS, and why not Tobit.** The scores share an estimated frontier, so
+they are correlated by construction in a way that depends on the sample, and
+conventional standard errors do not describe their sampling distribution. Tobit
+does not fix it: censoring is a statement about how a variable is *observed*,
+and the mass at the frontier here is an artefact of a boundary estimator, not a
+censored observation of something else. So the efficient DMUs are **dropped**
+rather than censored — once it is known the frontier was hit, that observation
+says nothing further about `z`.
+
+**The response is Shephard's distance, so the signs read backwards.** The
+regression is in `delta >= 1` (`1/theta` input-oriented, `phi` output-oriented)
+truncated at 1, so a *positive* coefficient means *less* efficiency. That is
+what the paper reports and it is the opposite of what a reader expects, so
+`print()` says it on every fit.
+
+**How much this matters, measured rather than asserted.** 200 replications at
+n = 150 on a design whose `beta` is known, against a nominal 95% interval:
+
+| | Algorithm #1 | Algorithm #2 | OLS on `delta_hat` |
+|---|---|---|---|
+| intercept bias | -0.070 | **-0.039** | +0.052 |
+| intercept coverage | 0.650 | **0.785** | 0.440 |
+| slope 1 bias | -0.015 | **+0.005** | -0.160 |
+| slope 1 coverage | 0.900 | **0.905** | **0.065** |
+| slope 2 bias | +0.009 | **-0.001** | +0.083 |
+| slope 2 coverage | 0.885 | **0.920** | **0.000** |
+
+The naive route's slope intervals essentially never contain the truth, and its
+slope bias is ten times Algorithm #2's. Between the two algorithms, #2 is
+nearer the truth for every coefficient — compared on the same 200 datasets,
+paired |t| of 13.4, 3.8 and 4.4 — but on interval *coverage* it beats #1 only
+on the intercept (+0.135, paired se 0.027); for the slopes both sit near 0.90
+and the difference is not resolvable. Neither reaches nominal on the intercept,
+which is where the frontier bias concentrates. `horserace/twostage_experiment.R`
+in the development repository is the script.
+
+**The truncated-regression MLE is written here**, since neither `truncreg` nor
+`npsf` is a dependency or will become one. It is pinned against both:
+coefficients agree with `npsf` to 9e-9 and with `truncreg` to its own optimiser
+tolerance. Recording the **log-likelihood** as well as the coefficients is what
+caught the first version dropping the `0.5*log(2*pi)` constant — invisible in
+every coefficient, since it does not move the optimum, and off by `n * 0.9189`
+in `$logLik`.
+
+**A note on pairing that refines the rule this package has applied twice
+before.** All three methods see the same datasets, so their differences are
+paired. For the two Simar-Wilson algorithms pairing shrinks the standard error
+by 1.3x-1.6x, as expected. For either of them against OLS it **inflates** it by
+about 1.2x, because their coverage indicators are negatively correlated.
+Pairing gives the standard error the design supports; smaller is a frequent
+consequence and not the point.
+
 ## Weight restrictions, assurance regions and the cone-ratio model
 
 `dea_wr()`, with restrictions built by `wr_bound()` (Dyson and Thanassoulis

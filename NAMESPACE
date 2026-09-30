@@ -1,5 +1,5 @@
 export(dea, dea_sbm, dea_ddf, dea_add, dea_rts, dea_boot, dea_sim, dea_rate,
-       dea_panel, dea_malmquist, dea_wr, dea_cone,
+       dea_panel, dea_malmquist, dea_wr, dea_cone, dea_reg,
        wr_bound, wr_ratio, wr_linear,
        dea_cost, dea_revenue, dea_profit, dea_cross,
        efficiency, peers, slacks, multipliers)
@@ -10,8 +10,9 @@ import("lpSolveAPI")
 ## generic the namespace cannot see fails at LOAD time, not at call time, with
 ## "object 'nobs' not found whilst loading namespace" -- so the package
 ## installs cleanly and then refuses to load.
-importFrom("stats", "IQR", "bw.SJ", "bw.nrd0", "bw.ucv", "fitted",
-                    "model.matrix", "nobs", "quantile", "rexp", "rnorm",
+importFrom("stats", "IQR", "bw.SJ", "bw.nrd0", "bw.ucv", "coef", "dnorm",
+                    "fitted", "lm.fit", "model.matrix", "nobs", "optim",
+                    "pnorm", "qnorm", "quantile", "rexp", "rnorm",
                     "runif", "sd", "terms")
 importFrom("graphics", "abline", "hist", "legend", "lines", "par",
                       "points", "segments")
@@ -47,6 +48,11 @@ S3method(c,     dea_restriction)
 S3method(print,   dea_wr)
 S3method(peers,   dea_wr)
 S3method(slacks,  dea_wr)
+
+S3method(print,   dea_reg)
+S3method(summary, dea_reg)
+S3method(nobs,    dea_reg)
+S3method(coef,    dea_reg)
 
 S3method(print,   dea_panel)
 S3method(summary, dea_panel)

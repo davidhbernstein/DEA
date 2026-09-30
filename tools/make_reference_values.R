@@ -151,6 +151,8 @@ toy_ <- function(n, p, q, seed, returns = 1) {
 cat("Benchmarking ", as.character(packageVersion("Benchmarking")),
     " / DJL ", as.character(packageVersion("DJL")),
     " / productivity ", as.character(packageVersion("productivity")),
+    " / truncreg ", as.character(packageVersion("truncreg")),
+    " / npsf ", as.character(packageVersion("npsf")),
     "\n", sep = "")
 
 ## ---------------------------------------------------------------------------
@@ -238,6 +240,51 @@ for (rts in c("crs", "vrs")) for (ori in c("none", "in", "out")) {
                                           stringsAsFactors = FALSE)
 }
 wr(do.call(rbind, rows), "sbm_DJL.csv")
+
+## --- the truncated regression, against two implementations of it -----------
+## .truncreg() is written inside this package because the two packages that
+## provide a truncated regression are not, and will not become, dependencies --
+## the same reasoning as everything else in this file. So its answers are
+## pinned here against BOTH of them.
+##
+## truncreg::truncreg is the dedicated implementation; npsf::truncreg is the
+## one a DEA user is most likely to reach for, since npsf is a DEA package.
+## They agree with each other and with this one to their own optimiser
+## tolerances, which differ: npsf matches to 1e-9 and truncreg to about 1e-5,
+## so the recorded values are npsf's and the tolerance is truncreg's.
+##
+## The LOG-LIKELIHOOD is recorded too, and it is the reason this block exists
+## in the form it does: the first version of .truncreg() dropped the
+## 0.5*log(2*pi) constant, which does not move the optimum and made $logLik
+## wrong by n * 0.9189 -- invisible in every coefficient and obvious the moment
+## it was compared with someone else's.
+set.seed(7)
+{
+  n <- 400L
+  z1 <- runif(n); z2 <- rnorm(n)
+  yy <- 1.2 + 0.8 * z1 - 0.5 * z2 + rnorm(n, 0, 0.6)
+  keep <- yy > 1
+  dd <- data.frame(y = yy[keep], z1 = z1[keep], z2 = z2[keep])
+  Z <- cbind(`(Intercept)` = 1, z1 = dd$z1, z2 = dd$z2)
+
+  mine <- .truncreg(dd$y, Z, ll = 1)
+  tr <- truncreg::truncreg(y ~ z1 + z2, data = dd, point = 1,
+                           direction = "left")
+  np <- npsf::truncreg(y ~ z1 + z2, data = dd, ll = 1, print.level = 0)
+
+  .agree(c(mine$beta, mine$sigma), as.numeric(coef(tr)), 1e-4,
+         "truncated regression (truncreg)")
+  .agree(c(mine$beta, mine$sigma), as.numeric(np$coef), 1e-7,
+         "truncated regression (npsf)")
+  .agree(mine$logLik, as.numeric(stats::logLik(tr)), 1e-5,
+         "truncated regression logLik")
+
+  wr(data.frame(term = c(names(mine$beta), "sigma"),
+                estimate = as.numeric(np$coef),
+                logLik = as.numeric(stats::logLik(tr)),
+                stringsAsFactors = FALSE),
+     "truncreg_reference.csv")
+}
 
 ## --- weight restrictions, against Benchmarking::dea.dual --------------------
 ## Benchmarking's DUAL argument takes only one shape of restriction -- ratios
