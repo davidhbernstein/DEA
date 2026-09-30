@@ -300,3 +300,84 @@ test_that("the oriented slacks-based measure recovers a DMU the reuse loses", {
   expect_false(any(is.na(f$eff)))
   expect_equal(unname(f$eff[108]), 1, tolerance = 1e-9)
 })
+
+## ---------------------------------------------------------------------------
+## A fresh program that fails just as reliably as the reused one.
+##
+## The retry guard was built for basis-state carryover: an lpSolveAPI object
+## reused across DMUs inherits a factorisation that some right-hand sides cannot
+## be solved from, and a fresh object fixes it.  This is a DIFFERENT class.  A
+## freshly built program fails here five times out of five, so rebuilding cannot
+## help; changing the scaling mode solves it immediately.  The two remedies are
+## complementary -- rebuilding fixed all 56 of the observed carryover failures
+## and scaling fixed at most a quarter, while here rebuilding fixes none and
+## scaling fixes all.
+##
+## Every case found is a DMU that NO other DMU weakly dominates in all inputs,
+## evaluated output-oriented under variable returns.  The feasible set is then a
+## sliver around the single vertex lambda = e_o, which is as degenerate as this
+## program gets.
+##
+## The answer is not guessed.  For each case the dual is feasible with objective
+## 1, so phi <= 1 by weak duality, while lambda = e_o is primal-feasible, so
+## phi >= 1.  Hence phi = 1 exactly, and the test asserts the recovered value
+## against the dual rather than against a number recorded by hand.
+## ---------------------------------------------------------------------------
+
+fresh_fail_cases <- list(
+  ## The one that matters most: the DEFAULT Cobb-Douglas design, no new geometry
+  ## needed. Found at a rate of 1 fit in 480 on a p = 3 sweep.
+  list(seed = 53456, n = 400, p = 3, shape = "cobb",  par = NULL, dmu = 64),
+  list(seed = 12521, n = 400, p = 3, shape = "ces",   par = 0.5,  dmu = 62),
+  list(seed = 12521, n = 400, p = 3, shape = "ces",   par = 1,    dmu = 62),
+  list(seed = 12521, n = 400, p = 3, shape = "facet", par = 2,    dmu = 62),
+  list(seed = 4041,  n = 400, p = 2, shape = "facet", par = 2,    dmu = 346))
+
+test_that("a fresh-object solver failure is recovered by rescaling", {
+  for (cs in fresh_fail_cases) {
+    lab <- paste0("seed ", cs$seed, " ", cs$shape, " DMU ", cs$dmu)
+    s <- dea_sim(cs$n, p = cs$p, q = 1, returns = 1, frontier = cs$shape,
+                 frontier_par = cs$par, seed = cs$seed)
+    ## No warning: the DMU is not lost, so nothing is reported unsolved.
+    fit <- expect_silent(dea(s$x, s$y, rts = "vrs", orientation = "out",
+                             slack = FALSE, peers = FALSE, multipliers = TRUE))
+    expect_equal(fit$status[cs$dmu], 0L, info = lab)
+    expect_false(is.na(fit$eff[cs$dmu]))
+    ## Strong duality is the check, not a recorded constant.
+    dual <- unname(sum(fit$v[cs$dmu, ] * s$x[cs$dmu, ]) -
+                   if (is.null(fit$u0)) 0 else fit$u0[cs$dmu])
+    expect_equal(unname(fit$eff[cs$dmu]), dual, tolerance = 1e-7, info = lab)
+    ## The structural signature: nothing else is weakly below it in every input.
+    expect_equal(sum(apply(sweep(s$x, 2L, s$x[cs$dmu, ], "<="), 1L, all)), 1L,
+                 info = lab)
+  }
+})
+
+test_that("the rescale stage is what recovers it, not the rebuild", {
+  ## Without this test the previous one would still pass if some unrelated
+  ## change happened to make the program solvable, and the escalation could be
+  ## deleted unnoticed. So: show stage two genuinely fails and stage three
+  ## genuinely succeeds, on the same program.
+  cs <- fresh_fail_cases[[1]]
+  s <- dea_sim(cs$n, p = cs$p, q = 1, returns = 1, seed = cs$seed)
+  sc <- .dea_scale(s$x, s$y, TRUE)
+  Xs <- sweep(s$x, 2L, sc$sx, "/"); Ys <- sweep(s$y, 2L, sc$sy, "/")
+  at <- function(mode) {
+    B <- .lp_radial_build(sc$X, sc$Y, "vrs", "out")
+    if (!is.null(mode)) invisible(lpSolveAPI::lp.control(B$lp, scaling = mode))
+    .lp_radial_at(B, Xs, Ys, cs$dmu, exclude = NULL)
+  }
+  ## Stage two: a brand-new object, repeatedly. Status 5 every time.
+  for (i in 1:3) expect_equal(at(NULL)$status, 5L)
+  ## Stage three: the first fallback mode. The order in LP_SCALING_FALLBACK is
+  ## "range" then "mean" because "range" recovered all five cases and "mean"
+  ## four, so the head of that list must be the one that works here.
+  first <- .DEA_CONSTANTS$LP_SCALING_FALLBACK[1]
+  expect_equal(at(first)$status, 0L)
+  expect_equal(at(first)$eff, 1, tolerance = 1e-9)
+  ## And the whole escalation, driven through the helper the sweep uses.
+  B <- .lp_radial_build(sc$X, sc$Y, "vrs", "out")
+  r <- .lp_radial_solve(B, sc$X, sc$Y, "vrs", "out", Xs, Ys, cs$dmu, NULL)
+  expect_equal(r$status, 0L)
+  expect_equal(r$eff, 1, tolerance = 1e-9)
+})

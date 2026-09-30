@@ -108,3 +108,122 @@ test_that("dea_sim() validates its design arguments", {
   expect_error(dea_sim(50, x_range = c(0, 2)), "increasing positive")
   expect_error(dea_sim(50, x_range = 1), "increasing positive")
 })
+
+## ---------------------------------------------------------------------------
+## Frontier geometry.  The whole reason a second shape is cheap is that the
+## closed forms need homogeneity of degree r and NOTHING else -- not
+## smoothness, not strict concavity, nothing Cobb-Douglas.  That is an argument,
+## so it gets a test that does not assume it: the distance is brute-forced from
+## its DEFINITION with uniroot and compared against the formula the object
+## reports.  If the reasoning were wrong for the non-smooth shape, this is where
+## it would show.
+## ---------------------------------------------------------------------------
+
+## f as each shape defines it, written out independently of R/sim.R's vectorised
+## code so that a shared slip cannot cancel out.
+sim_f <- function(shape, par, r, p) {
+  switch(shape,
+    cobb  = function(x) prod(x)^(r / p),
+    ces   = function(x) (mean(x^par))^(r / par),
+    facet = { A <- DEA:::.sim_facets(as.integer(par), p)
+              function(x) (min(A %*% x) / p)^r })
+}
+
+geom_cases <- list(
+  list(shape = "cobb",  par = NULL, p = 2, r = 1.0),
+  list(shape = "cobb",  par = NULL, p = 3, r = 0.8),
+  list(shape = "ces",   par = 0.5,  p = 2, r = 0.9),
+  list(shape = "ces",   par = 1,    p = 2, r = 1.0),   # flat frontier
+  list(shape = "ces",   par = -2,   p = 3, r = 0.7),   # past Leontief-ward
+  list(shape = "facet", par = 2,    p = 2, r = 1.0),
+  list(shape = "facet", par = 4,    p = 3, r = 0.85))
+
+test_that("every frontier shape is homogeneous of degree `returns`", {
+  for (cs in geom_cases) {
+    f <- sim_f(cs$shape, cs$par, cs$r, cs$p)
+    s <- dea_sim(40, p = cs$p, q = 1, returns = cs$r, frontier = cs$shape,
+                 frontier_par = cs$par, seed = 11)
+    set.seed(5)
+    for (i in 1:20) {
+      x <- s$x[i, ]; t <- 0.3 + 2 * runif(1)
+      expect_equal(f(t * x), t^cs$r * f(x), tolerance = 1e-10,
+                   info = paste(cs$shape, cs$par))
+    }
+  }
+})
+
+test_that("the closed-form truth survives every shape, brute-forced", {
+  for (cs in geom_cases) {
+    f <- sim_f(cs$shape, cs$par, cs$r, cs$p)
+    s <- dea_sim(60, p = cs$p, q = 2, returns = cs$r, frontier = cs$shape,
+                 frontier_par = cs$par, seed = 11)
+    ny <- sqrt(rowSums(s$y^2))
+    lab <- paste(cs$shape, cs$par)
+    ## The generative identity, independent of any distance.
+    expect_equal(ny, vapply(seq_len(60), function(i) f(s$x[i, ]), 0) * exp(-s$u),
+                 tolerance = 1e-10, info = lab)
+    ## theta = the smallest t with f(t x) >= ||y||, solved numerically.
+    brute_t <- vapply(seq_len(60), function(i)
+      stats::uniroot(function(t) f(t * s$x[i, ]) - ny[i], c(1e-8, 1),
+                     tol = 1e-14)$root, 0)
+    expect_equal(brute_t, unname(s$theta), tolerance = 1e-8, info = lab)
+    ## phi = the largest scaling of y still inside the output set.
+    brute_p <- vapply(seq_len(60), function(i) f(s$x[i, ]) / ny[i], 0)
+    expect_equal(brute_p, unname(s$phi), tolerance = 1e-10, info = lab)
+  }
+})
+
+test_that("the shapes agree on the diagonal, so `returns` means one thing", {
+  ## f(c, ..., c) = c^r for all three, which is what lets a geometry table be
+  ## read down a column: only the shape changes, not the scale elasticity.
+  for (p in 2:3) for (r in c(0.7, 1)) {
+    fs <- list(sim_f("cobb", NULL, r, p), sim_f("ces", 0.4, r, p),
+               sim_f("ces", -3, r, p), sim_f("facet", 2, r, p))
+    for (cc in c(1, 1.5, 2)) for (f in fs)
+      expect_equal(f(rep(cc, p)), cc^r, tolerance = 1e-10)
+  }
+})
+
+test_that("the default shape is unchanged by the shape argument existing", {
+  ## `frontier` was added to a released function; the Cobb-Douglas path must be
+  ## bit-identical or every number recorded before it moves.
+  for (cs in list(list(p = 1, q = 1, r = 1), list(p = 2, q = 1, r = 0.9),
+                  list(p = 3, q = 2, r = 0.7))) {
+    a <- dea_sim(90, p = cs$p, q = cs$q, returns = cs$r, seed = 3)
+    b <- dea_sim(90, p = cs$p, q = cs$q, returns = cs$r, seed = 3,
+                 frontier = "cobb")
+    for (f in c("x", "y", "theta", "phi", "u", "frontier"))
+      expect_identical(a[[f]], b[[f]])
+    expect_null(a$facet)
+  }
+})
+
+test_that("a facet design reports which facets actually bind", {
+  ## A facet that is never the minimum contributes nothing, so `frontier_par`
+  ## would overstate the geometry. p >= 3 is where interior facets can bind.
+  s <- dea_sim(400, p = 3, q = 1, frontier = "facet", frontier_par = 4, seed = 2)
+  expect_length(s$facet, 400L)
+  expect_setequal(unique(s$facet), 1:4)
+  expect_equal(dim(s$facet_normals), c(4L, 3L))
+  expect_true(all(s$facet_normals > 0))
+  expect_equal(unname(rowSums(s$facet_normals)), rep(3, 4), tolerance = 1e-12)
+})
+
+test_that("dea_sim() refuses geometries that would misreport themselves", {
+  ## Collinear normals at p = 2: only the two endpoints can ever be the
+  ## minimum, so m > 2 there is always an overstatement.
+  expect_error(dea_sim(50, p = 2, frontier = "facet", frontier_par = 3),
+               "only 2 of them can ever be active")
+  expect_error(dea_sim(50, p = 1, frontier = "facet"), "at least 2 inputs")
+  expect_error(dea_sim(50, p = 2, frontier = "facet", frontier_par = 1),
+               "single whole number")
+  ## rho > 1 makes the technology non-convex, so the reported theta stops being
+  ## the estimand rather than merely being hard to reach.
+  expect_error(dea_sim(50, p = 2, frontier = "ces", frontier_par = 1.5),
+               "convex hull")
+  expect_error(dea_sim(50, p = 2, frontier = "ces", frontier_par = 1e-6),
+               "Cobb-Douglas")
+  expect_error(dea_sim(50, frontier = "cobb", frontier_par = 2),
+               "no meaning")
+  expect_error(dea_sim(50, p = 2, frontier = "nope"), "frontier")
+})

@@ -10,7 +10,14 @@
   TOL_LAMBDA = 1e-8,   ## a lambda below this is not a peer
   TOL_SLACK  = 1e-8,   ## a slack below this is zero
   LP_EPSEL   = 1e-12,  ## lpSolveAPI rounding epsilon
-  MIN_POS    = 1e-12   ## floor for a denominator that must be positive
+  MIN_POS    = 1e-12,  ## floor for a denominator that must be positive
+  ## Scaling modes to try, in order, when a FRESH program still fails. These
+  ## are the second remedy, not a variant of the first: rebuilding fixes the
+  ## basis-state class and does nothing for this one, while rescaling fixes
+  ## this one and fixed at most a quarter of the other. "range" recovered all
+  ## five observed cases, "mean" four of them, which is the order. See the
+  ## long note at .lp_solve_retry().
+  LP_SCALING_FALLBACK = c("range", "mean")
 )
 
 `%||%` <- function(a, b) if (is.null(a)) b else a

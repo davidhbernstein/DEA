@@ -51,9 +51,16 @@ dea_sim <- function(n, p = 1L, q = 1L,
                     ineff = c("exp", "hnorm"),
                     mean_ineff = 0.3,
                     x_range = c(1, 2),
-                    seed = NULL) {
+                    seed = NULL,
+                    ## Appended after `seed` rather than placed next to
+                    ## `returns`, where they belong logically: the package is
+                    ## released, so inserting an argument mid-signature would
+                    ## silently change the meaning of any positional call.
+                    frontier = c("cobb", "ces", "facet"),
+                    frontier_par = NULL) {
 
   ineff <- .match_arg_ci(ineff, c("exp", "hnorm"), "ineff")
+  frontier <- .match_arg_ci(frontier, c("cobb", "ces", "facet"), "frontier")
   if (!is.numeric(n) || length(n) != 1L || n < 1) {
     stop("`n` must be a single positive number of DMUs.", call. = FALSE)
   }
@@ -81,7 +88,8 @@ dea_sim <- function(n, p = 1L, q = 1L,
 
   X <- matrix(stats::runif(n * p, x_range[1], x_range[2]), n, p,
               dimnames = list(NULL, paste0("x", seq_len(p))))
-  fx <- exp(rowSums(log(X)) * (returns / p))
+  fr <- .sim_frontier(X, returns, frontier, frontier_par)
+  fx <- fr$fx
 
   ## u >= 0, with E[u] = mean_ineff under either family, so the two designs are
   ## comparable at the same nominal inefficiency.
@@ -100,9 +108,183 @@ dea_sim <- function(n, p = 1L, q = 1L,
     theta = exp(-u / returns),   ## true input-oriented Farrell efficiency
     phi   = exp(u),              ## true output-oriented Farrell efficiency
     u = u, frontier = fx,
+    ## Which facet each DMU sits under, for frontier = "facet" and NULL
+    ## otherwise. Reported rather than discarded because a facet design with
+    ## only one active facet is a LINEAR design wearing m normals, and nothing
+    ## else in the returned object would reveal that.
+    facet = fr$facet, facet_normals = fr$A,
     design = list(n = n, p = p, q = q, returns = returns, ineff = ineff,
-                  mean_ineff = mean_ineff, x_range = x_range, seed = seed)
+                  mean_ineff = mean_ineff, x_range = x_range, seed = seed,
+                  shape = frontier, shape_par = fr$par)
   ), class = "dea_sim")
+}
+
+## ---------------------------------------------------------------------------
+## The frontier shape.
+##
+## WHY ANOTHER GEOMETRY IS CHEAP, WHICH IS NOT OBVIOUS -- the ROADMAP costed
+## this at two days, "most of it deriving and checking the distance functions".
+## Almost none of that is needed, because both closed forms above survive ANY
+## change of shape provided f stays HOMOGENEOUS OF DEGREE r:
+##
+##   phi   = f(x) / ||y||                            -- true for any f at all
+##   theta = min{ t : f(tx) >= ||y|| }
+##         = min{ t : t^r f(x) >= f(x) e^{-u} }  =  e^{-u/r}
+##
+## The second line uses homogeneity and nothing else: not smoothness, not
+## strict concavity, and nothing Cobb-Douglas. So every shape offered here is
+## built homogeneous of degree `returns`, the truth needs no re-derivation and
+## no root-finding, and `test-sim.R` checks that claim against the estimator
+## rather than taking it on trust.
+##
+## All three agree on the diagonal, f(c, ..., c) = c^r, so `returns` means the
+## same thing across shapes and a convergence table can be read down a column.
+##
+##   cobb   f(x) = (prod_j x_j)^(r/p)
+##          Smooth, strictly concave. The original, and still the default.
+##
+##   ces    f(x) = ((1/p) sum_j x_j^rho)^(r/rho)
+##          Nests the other two: rho -> 0 IS cobb (the geometric mean is the
+##          limit of the power mean), rho = 1 is an arithmetic mean and so a
+##          flat frontier, rho -> -Inf is Leontief min(). So `rho` moves
+##          curvature continuously, which is the point of it -- the estimator's
+##          difficulty ought to vary with curvature, and a single shape cannot
+##          show whether it does.
+##
+##   facet  f(x) = (min_k a_k'x / p)^r  over m facets
+##          Piecewise linear: the shape a DEA hull can represent EXACTLY, so
+##          the estimator should do BEST here, and the shape with flat faces,
+##          so the optimal face is not a point and the projection is not
+##          unique. That last is the geometry the convergence study was
+##          missing and the one most likely to find something.
+##
+## rho > 1 is REFUSED rather than clamped. It makes f convex, so T is not
+## convex; a vrs estimator then consistently estimates the convex hull of T
+## instead of T. `theta` above would still be the true distance to T, and would
+## no longer be what the estimator converges to -- the design would quietly
+## score the estimator against the wrong number, which is worse than not
+## offering the option.
+##
+## THE FACET NORMALS ARE DETERMINISTIC, and that is not housekeeping. Drawn
+## from the RNG they would move with `seed`, so "the same geometry at n = 100
+## and at n = 800" would be false and the convergence slope would be fitted
+## across a moving target -- the one thing the study must not do. They come
+## from a fixed golden-ratio phase pattern instead. A plain k/m by j/p lattice
+## was tried first and is WRONG: with p = 2 and m = 3 it aliases, facets 2 and
+## 3 coming out identical, so `m` would overstate the geometry. The irrational
+## phase is what prevents that, and `.sim_facets()` checks for coincident rows
+## anyway rather than trusting the argument.
+##
+## Every normal is scaled to sum to p, which puts every facet through the
+## diagonal ray. The frontier is then a fan of m flat faces meeting along that
+## ridge: each face wins in its own region, so all m are genuinely active, and
+## near the diagonal they TIE -- which is the non-unique projection, present by
+## construction rather than by luck.
+## ---------------------------------------------------------------------------
+.sim_frontier <- function(X, returns, frontier, par) {
+  p <- ncol(X)
+
+  if (frontier == "cobb") {
+    if (!is.null(par)) {
+      stop("`frontier_par` has no meaning for frontier = \"cobb\": the ",
+           "Cobb-Douglas shape is fixed once `returns` is given. Use ",
+           "frontier = \"ces\" for a tunable curvature.", call. = FALSE)
+    }
+    ## Left exactly as it was written, so the default design is bit-identical
+    ## to every result recorded before the shape argument existed.
+    return(list(fx = exp(rowSums(log(X)) * (returns / p)),
+                par = NULL, facet = NULL, A = NULL))
+  }
+
+  if (frontier == "ces") {
+    rho <- if (is.null(par)) 0.5 else par
+    if (!is.numeric(rho) || length(rho) != 1L || !is.finite(rho)) {
+      stop("`frontier_par` for frontier = \"ces\" is rho, a single finite ",
+           "number.", call. = FALSE)
+    }
+    if (rho > 1) {
+      stop("`frontier_par` = ", rho, " > 1 makes the CES frontier CONVEX, so ",
+           "the technology is not convex and a vrs estimator converges to the ",
+           "convex hull of it rather than to it. The closed-form `theta` this ",
+           "function returns would still be the true distance and would no ",
+           "longer be the estimand, so the design would score the estimator ",
+           "against the wrong number. rho must be <= 1.", call. = FALSE)
+    }
+    if (abs(rho) < 1e-3) {
+      stop("`frontier_par` = ", rho, " is numerically at the rho -> 0 limit, ",
+           "where CES IS Cobb-Douglas; the power-mean formula loses all its ",
+           "precision there. Use frontier = \"cobb\", which is that limit in ",
+           "closed form.", call. = FALSE)
+    }
+    fx <- (rowMeans(X^rho))^(returns / rho)
+    return(list(fx = fx, par = rho, facet = NULL, A = NULL))
+  }
+
+  ## --- facet ----------------------------------------------------------------
+  if (p < 2L) {
+    stop("frontier = \"facet\" needs at least 2 inputs. With p = 1 every ",
+         "facet normal reduces to the same number, so the shape collapses to ",
+         "f(x) = x^returns -- which is exactly frontier = \"cobb\" at p = 1. ",
+         "Allowing it would put a duplicate row in a geometry comparison and ",
+         "make the two shapes look like independent evidence.", call. = FALSE)
+  }
+  m <- if (is.null(par)) 3L else par
+  if (!is.numeric(m) || length(m) != 1L || !is.finite(m) || m < 2 || m != round(m)) {
+    stop("`frontier_par` for frontier = \"facet\" is the number of facets: a ",
+         "single whole number >= 2. One facet is a flat frontier, for which ",
+         "frontier = \"ces\" with rho = 1 is the honest name.", call. = FALSE)
+  }
+  m <- as.integer(m)
+  ## With every normal scaled to sum to p, the normals are COLLINEAR when
+  ## p = 2 -- they lie on a line in the sum = p plane -- and a'x is linear in a,
+  ## so a minimum over collinear points is always attained at an endpoint. At
+  ## p = 2, therefore, exactly two facets can ever be active however many are
+  ## constructed, and the rest are dominated everywhere. Measured: m = 3, 4 and
+  ## 6 at p = 2 all give 2 active facets, splitting the sample 51/49. Refused
+  ## up front rather than warned about, because it is knowable from p and m
+  ## alone and is always an overstatement of the geometry.
+  if (p == 2L && m > 2L) {
+    stop("frontier = \"facet\" with ", m, " facets and p = 2 inputs: only 2 ",
+         "of them can ever be active. Every normal is scaled to sum to p, so ",
+         "at p = 2 they are collinear, and min_k a_k'x over collinear a_k is ",
+         "always attained at an endpoint -- the other ", m - 2L, " facet(s) ",
+         "are dominated at every x. Use frontier_par = 2, or p >= 3 where ",
+         "interior facets do bind.", call. = FALSE)
+  }
+  A <- .sim_facets(m, p)
+  lin <- X %*% t(A) / p
+  k <- apply(lin, 1L, which.min)
+  ## The real guard on the geometry is which facets BIND, not whether the
+  ## normals are distinct: a facet that is never the minimum contributes
+  ## nothing, and `m` would then overstate the shape being studied.
+  if (length(unique(k)) < m) {
+    warning("frontier = \"facet\" asked for ", m, " facets but only ",
+            length(unique(k)), " bind anywhere in this sample, so the ",
+            "geometry is simpler than `frontier_par` says. Check $facet.",
+            call. = FALSE)
+  }
+  list(fx = apply(lin, 1L, min)^returns, par = m, facet = k, A = A)
+}
+
+## Deterministic facet normals: m rows, p columns, every entry positive and
+## every row summing to p.  The phase advances by the golden-ratio conjugate
+## across inputs, which is irrational and so cannot come back into step with
+## the k/m advance across facets -- see the aliasing note above.
+.sim_facets <- function(m, p) {
+  g <- (sqrt(5) - 1) / 2
+  A <- outer(seq_len(m), seq_len(p),
+             function(k, j) 1 + 0.5 * cos(2 * pi * ((k - 1) / m + (j - 1) * g)))
+  A <- A * p / rowSums(A)
+  ## Coincident rows would mean the design has fewer facets than it says. The
+  ## construction is meant to prevent it; this is here so that a silent
+  ## reduction is impossible rather than merely unlikely.
+  if (m > 1L && min(stats::dist(A)) < 1e-8) {
+    stop("the facet construction produced coincident normals at m = ", m,
+         ", p = ", p, ", so the design would have fewer facets than ",
+         "requested. Pick a different `frontier_par`.", call. = FALSE)
+  }
+  dimnames(A) <- list(paste0("facet", seq_len(m)), paste0("x", seq_len(p)))
+  A
 }
 
 print.dea_sim <- function(x, ...) {
@@ -111,6 +293,16 @@ print.dea_sim <- function(x, ...) {
   cat("n = ", d$n, "   inputs = ", d$p, "   outputs = ", d$q,
       "   elasticity of scale = ", d$returns, "\n", sep = "")
   cat("input support: [", d$x_range[1], ", ", d$x_range[2], "]\n", sep = "")
+  ## The shape is printed with the number of facets that actually BIND, not the
+  ## number requested: those can differ, and the difference is the whole point
+  ## of recording $facet.
+  shape_txt <- switch(d$shape,
+    cobb  = "Cobb-Douglas (smooth, strictly concave)",
+    ces   = paste0("CES, rho = ", d$shape_par,
+                   if (d$shape_par == 1) " (flat)" else ""),
+    facet = paste0("piecewise linear, ", d$shape_par, " facets, ",
+                   length(unique(x$facet)), " binding"))
+  cat("frontier shape: ", shape_txt, "\n", sep = "")
   cat("inefficiency: ", d$ineff, ", E[u] = ", d$mean_ineff, "\n", sep = "")
   cat("true input efficiency theta:  ",
       paste(round(stats::quantile(x$theta, c(0, .5, 1)), 4), collapse = " / "),

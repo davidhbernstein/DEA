@@ -77,7 +77,79 @@
   st <- solve(lp)
   if (st %in% final) return(list(status = st, lp = lp))
   lp2 <- fresh()
-  list(status = solve(lp2), lp = lp2)
+  st <- solve(lp2)
+  if (st %in% final) return(list(status = st, lp = lp2))
+  ## STAGE THREE: a fresh object with a different scaling mode. See the second
+  ## half of the note above -- rebuilding cannot help a program that fails
+  ## identically however often it is rebuilt, and for that class a scaling
+  ## change does. Applied to the object `fresh()` returns rather than asking
+  ## every builder for a scaling argument: lpSolveAPI applies scaling at solve
+  ## time, so setting it after the program is aimed gives the same answer as
+  ## setting it before (checked both ways on a failing program).
+  for (mode in .DEA_CONSTANTS$LP_SCALING_FALLBACK) {
+    lp3 <- fresh()
+    invisible(lpSolveAPI::lp.control(lp3, scaling = mode))
+    st <- solve(lp3)
+    if (st %in% final) return(list(status = st, lp = lp3))
+  }
+  list(status = st, lp = lp3)
+}
+
+## Same three stages for the second-stage slack program, which likewise aims and
+## solves in one call. Stage three here is UNEXERCISED: every stage-two failure
+## observed so far -- 56 of them on a 1200-DMU variable-returns fit -- was fixed
+## by the rebuild alone. It is present because the failure class that needs it
+## was found in the stage-one program of the same sweep, and a guard that exists
+## only where the bug has already been seen is a guard against the past.
+.lp_slack_solve <- function(S, XRs, YRs, rts, rhs_x, rhs_y) {
+  z <- .lp_slack_at(S, rhs_x, rhs_y)          # the hot path, as above
+  if (z$status %in% c(0L, 1L)) return(z)
+  ok <- function(z) z$status %in% c(0L, 1L)
+  fresh <- function(mode = NULL) {
+    S2 <- .lp_slack_build(XRs, YRs, rts)
+    if (!is.null(mode)) invisible(lpSolveAPI::lp.control(S2$lp, scaling = mode))
+    S2
+  }
+  z <- .lp_slack_at(fresh(), rhs_x, rhs_y)
+  if (ok(z)) return(z)
+  for (mode in .DEA_CONSTANTS$LP_SCALING_FALLBACK) {
+    z <- .lp_slack_at(fresh(mode), rhs_x, rhs_y)
+    if (ok(z)) return(z)
+  }
+  z
+}
+
+## The radial sweep's own version of the three stages. It needs its own because
+## .lp_radial_at() aims and solves in one call, so there is no aimed-but-unsolved
+## program for .lp_solve_retry() to take; the RULE is the same and is documented
+## once, above.
+## `B` is the ONE object built outside the caller's loop and reused across every
+## DMU -- that reuse is where this package's speed comes from, so the first
+## attempt must use it and only a failure may rebuild.
+.lp_radial_solve <- function(B, XRs, YRs, rts, orientation, Xs, Ys, o, exclude) {
+  ## The first attempt is the hot path -- it runs n times per fit and succeeds
+  ## essentially always -- so it is written without the helper closures below
+  ## rather than constructing them once per DMU for nothing. That is tidiness,
+  ## NOT a measured win: wrapping .lp_radial_at() in this function costs 0.983x
+  ## on an 800-DMU sweep and 0.987x end to end, both inside noise. An earlier
+  ## note here claimed 5.6%, which was an artifact of always timing the old
+  ## package first -- whichever of the two ran second measured slower, in both
+  ## orders.
+  r <- .lp_radial_at(B, Xs, Ys, o, exclude = exclude)
+  if (r$status %in% c(0L, 1L, 2L)) return(r)
+  ok <- function(r) r$status %in% c(0L, 1L, 2L)
+  fresh <- function(mode = NULL) {
+    B2 <- .lp_radial_build(XRs, YRs, rts, orientation)
+    if (!is.null(mode)) invisible(lpSolveAPI::lp.control(B2$lp, scaling = mode))
+    B2
+  }
+  r <- .lp_radial_at(fresh(), Xs, Ys, o, exclude = exclude)
+  if (ok(r)) return(r)
+  for (mode in .DEA_CONSTANTS$LP_SCALING_FALLBACK) {
+    r <- .lp_radial_at(fresh(mode), Xs, Ys, o, exclude = exclude)
+    if (ok(r)) return(r)
+  }
+  r
 }
 
 .lp_radial_build <- function(X, Y, rts, orientation) {

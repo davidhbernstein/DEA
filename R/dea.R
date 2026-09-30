@@ -149,18 +149,21 @@ dea <- function(x, y, data = NULL,
   suml <- numeric(n)
 
   for (o in seq_len(n)) {
-    r <- .lp_radial_at(B, Xs, Ys, o, exclude = if (super) o else NULL)
-    ## See the note on the stage-two retry below: a reused lpSolveAPI object
-    ## carries basis state between DMUs, and a fresh one is the fix. Stage one
-    ## has not been observed to fail where stage two does, but the failure mode
-    ## is a property of the reuse rather than of the program, so it is guarded
-    ## the same way. An infeasible program (status 2) is NOT retried -- that is
-    ## an answer about the data, and under super-efficiency it is the expected
-    ## one.
-    if (!r$status %in% c(0L, 1L, 2L)) {
-      B2 <- .lp_radial_build(XRs, YRs, rts, orientation)
-      r  <- .lp_radial_at(B2, Xs, Ys, o, exclude = if (super) o else NULL)
-    }
+    ## Three stages, all in .lp_radial_solve(): the reused object, then a fresh
+    ## one, then a fresh one with a different scaling mode. An infeasible
+    ## program (status 2) is not retried at all -- that is an answer about the
+    ## data, and under super-efficiency it is the expected one.
+    ##
+    ## Stage one DOES fail where stage two does; this file used to say it had
+    ## not been observed to, which was true only because nobody had looked with
+    ## a wide enough sweep. Measured afterwards: 1 fit in 480 on the default
+    ## Cobb-Douglas design at n = 400, p = 3, output-oriented vrs. Every case
+    ## found was a DMU that NO other DMU weakly dominates in all inputs, so the
+    ## feasible set is a sliver around the single vertex lambda = e_o, and the
+    ## rebuild alone cannot help -- a fresh object failed five times out of five
+    ## on the same program. See .lp_solve_retry().
+    r <- .lp_radial_solve(B, XRs, YRs, rts, orientation, Xs, Ys, o,
+                          exclude = if (super) o else NULL)
     eff[o] <- r$eff; st[o] <- r$status
     suml[o] <- if (all(is.na(r$lambda))) NA_real_ else sum(r$lambda)
     if (peers) L[o, ] <- r$lambda
@@ -178,7 +181,7 @@ dea <- function(x, y, data = NULL,
       if (!is.finite(eff[o])) { sx[o, ] <- NA_real_; sy[o, ] <- NA_real_; next }
       rhs_x <- if (orientation == "in") eff[o] * Xs[o, ] else Xs[o, ]
       rhs_y <- if (orientation == "in") Ys[o, ] else eff[o] * Ys[o, ]
-      z <- .lp_slack_at(S, rhs_x, rhs_y)
+      z <- .lp_slack_solve(S, XRs, YRs, rts, rhs_x, rhs_y)
       ## RETRY ON A FRESH LP. The single object is reused across all n DMUs and
       ## only its right-hand side is rewritten -- that is where this package's
       ## speed comes from -- but lpSolveAPI carries basis and factorisation
@@ -195,10 +198,6 @@ dea <- function(x, y, data = NULL,
       ## n = 1200 under vrs, none at all under crs, and none at small n. Paying
       ## a rebuild on those is far cheaper than rebuilding for everyone, which
       ## is the alternative that would undo the design.
-      if (!z$status %in% c(0L, 1L)) {
-        S2 <- .lp_slack_build(XRs, YRs, rts)
-        z  <- .lp_slack_at(S2, rhs_x, rhs_y)
-      }
       ## STAGE TWO'S STATUS HAS TO BE RECORDED. It was not, and the hole was
       ## silent: a slack program that failed returned NA slacks while `status`
       ## kept stage one's 0, no warning was raised, and `efficient` became NA
