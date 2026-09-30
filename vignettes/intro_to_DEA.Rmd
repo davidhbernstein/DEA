@@ -105,6 +105,22 @@ b_in <- dea_ddf(sim$x, sim$y, direction = "in", rts = "vrs")
 max(abs(b_in$beta - (1 - fit$eff)))
 ```
 
+`direction = "range"` is the **range directional model**, which points each DMU
+at the best value of every input and output at once. Its `beta` is the fraction
+of that distance the DMU could travel, so it lies in `[0, 1]` and reads like an
+ordinary inefficiency score — and under `rts = "vrs"` it is unchanged by adding
+a constant to any column, which is what makes it the usual answer for data that
+can be negative.
+
+```{r}
+rdm <- dea_ddf(sim$x, sim$y, direction = "range", rts = "vrs")
+range(rdm$beta)
+
+## the same fit on data shifted into negative territory
+shifted <- dea_ddf(sim$x - 3, sim$y - 1, direction = "range", rts = "vrs")
+max(abs(shifted$beta - rdm$beta))
+```
+
 ## Scale
 
 ```{r}

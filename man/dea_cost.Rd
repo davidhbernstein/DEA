@@ -28,7 +28,7 @@ dea_revenue(x, y, r, data = NULL,
             xref = NULL, yref = NULL, dataref = NULL)
 
 dea_profit(x, y, w, r, data = NULL,
-           direction = c("both", "in", "out", "unit", "mean"),
+           direction = c("both", "in", "out", "unit", "mean", "range"),
            rts = c("vrs", "nirs"),
            peers = TRUE, scaling = TRUE,
            xref = NULL, yref = NULL, dataref = NULL)
@@ -48,7 +48,12 @@ readings indistinguishable, the call is refused rather than guessed.}
 \item{rts}{Returns to scale, as in \code{\link{dea}}. \code{dea_profit()}
 accepts only \code{"vrs"} and \code{"nirs"}; see \strong{Details}.}
 \item{direction}{For \code{dea_profit()}, the direction \eqn{g} the profit gap
-is normalized by, in the forms \code{\link{dea_ddf}} accepts.}
+is normalized by, in the forms \code{\link{dea_ddf}} accepts --- including
+\code{"range"}, which normalizes by the value of the distance to the ideal
+point. The one direction it cannot use is a zero one: the gap is divided by
+\eqn{w'g_x + r'g_y}, so a DMU at the ideal point, whose range direction is
+zero by construction, is an error here where \code{\link{dea_ddf}} answers it
+with \eqn{\beta = 0}.}
 \item{peers, scaling, xref, yref, dataref}{As in \code{\link{dea}}.}
 \item{\dots}{Passed to the underlying plotting call.}
 }

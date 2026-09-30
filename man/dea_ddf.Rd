@@ -9,7 +9,7 @@ time.
 }
 \usage{
 dea_ddf(x, y, data = NULL,
-        direction = c("both", "in", "out", "unit", "mean"),
+        direction = c("both", "in", "out", "unit", "mean", "range"),
         rts = c("vrs", "crs", "nirs", "ndrs"),
         peers = TRUE, scaling = TRUE,
         xref = NULL, yref = NULL, dataref = NULL)
@@ -26,6 +26,12 @@ measured. One of
   \item{\code{"out"}}{\eqn{g = (0, y_o)}; then \eqn{\beta = \phi - 1}.}
   \item{\code{"unit"}}{\eqn{g = (1, \ldots, 1)}, one unit of every variable.}
   \item{\code{"mean"}}{the sample mean of each variable, the same for all DMUs.}
+  \item{\code{"range"}}{\eqn{g_o = (x_o - \min x, \max y - y_o)}, the vector
+    from the DMU to the technology's ideal point. This is the \strong{range
+    directional model} of Portela, Thanassoulis and Simpson (2004); see
+    \sQuote{The range directional model} below. The minimum and maximum are
+    taken over the \emph{reference} set, unlike \code{"mean"}, which uses the
+    evaluated set.}
 }
 Or a numeric vector of length \code{p + q} giving one fixed direction, inputs
 first; or a \code{n} by \code{p + q} matrix giving one per DMU.}
@@ -74,6 +80,42 @@ imply.
 \strong{No common ratio scale.} \code{\link{efficiency}(fit, "score")} refuses
 to convert \eqn{\beta} to a \eqn{(0, 1]} score for a direction that is not
 purely input or purely output, because no such conversion exists.
+
+\strong{The range directional model.} \code{direction = "range"} is the model
+of Portela, Thanassoulis and Simpson (2004). The direction is the vector from
+each DMU to the \emph{ideal point} of the reference set --- the corner of its
+bounding box that is best in every coordinate at once --- so \eqn{\beta} reads
+as the fraction of the distance to that point the DMU could travel. Two
+properties follow, and both are \code{rts = "vrs"} properties.
+
+\eqn{\beta} lies in \eqn{[0, 1]}. Under variable returns \eqn{X'\lambda} is a
+convex combination of the reference inputs and so cannot fall below their
+minimum, which forces \eqn{\beta \le 1}; the same argument applies on the
+output side. The bound also held under every cone tested here, but the
+elementary argument does not cover them, so it is stated for what it is proved
+for.
+
+\eqn{\beta} is translation invariant, which is the reason to use this model at
+all. Adding a constant to a column leaves \eqn{g} unchanged, since it is a
+difference of two values in that column, and shifts both sides of the
+constraint by \eqn{t \sum \lambda} --- equal only when \eqn{\sum \lambda = 1}.
+So negative inputs or outputs need no translation before fitting, and the
+answer does not depend on one. Under a cone this fails, and by a wide margin
+rather than subtly.
+
+The range is taken over the \emph{reference} set, because it is the reference
+DMUs that span the technology and the \eqn{[0, 1]} bound is a statement about
+that technology. With a separate \code{xref}/\code{yref} an evaluated DMU can
+lie outside that set's box; a direction component that would point backwards is
+clamped to zero, with a warning, since a coordinate already better than
+anything in the technology has no room to improve. A DMU that attains the best
+value in \emph{every} input and output is the ideal point itself: its direction
+is zero, its \eqn{\beta} is 0, no program is solved --- it would be unbounded,
+not infeasible --- and its peers are reported as \code{NA}, with a warning.
+
+\code{\link{dea_profit}} takes the same argument, but has no answer at such a
+DMU: the Nerlovian measure divides the profit gap by \eqn{w'g_x + r'g_y}, which
+is zero there.
 }
 \references{
 Chambers, R. G., Chung, Y. and Fare, R. (1996). Benefit and distance functions.
@@ -82,6 +124,10 @@ Chambers, R. G., Chung, Y. and Fare, R. (1996). Benefit and distance functions.
 Chung, Y. H., Fare, R. and Grosskopf, S. (1997). Productivity and undesirable
 outputs: a directional distance function approach.
 \emph{Journal of Environmental Management} 51, 229--240.
+
+Portela, M. C. A. S., Thanassoulis, E. and Simpson, G. (2004). Negative data in
+DEA: a directional distance approach applied to bank branches.
+\emph{Journal of the Operational Research Society} 55, 1111--1121.
 }
 \seealso{\code{\link{dea}}, \code{\link{dea_sbm}}}
 \examples{
@@ -96,4 +142,11 @@ max(abs(b$beta - (1 - t$eff)))
 
 ## A fixed direction: one unit of every variable.
 dea_ddf(sim$x, sim$y, direction = "unit", rts = "vrs")
+
+## The range directional model: beta is the fraction of the distance to the
+## ideal point, so it lies in [0, 1], and it survives data of either sign.
+r <- dea_ddf(sim$x, sim$y, direction = "range", rts = "vrs")
+range(r$beta)
+shifted <- dea_ddf(sim$x - 3, sim$y - 1, direction = "range", rts = "vrs")
+max(abs(shifted$beta - r$beta))    # translation invariant under vrs
 }

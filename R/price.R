@@ -80,7 +80,7 @@ dea_revenue <- function(x, y, r, data = NULL,
 ## no information. Profit maximization is a variable-returns question.
 ## ---------------------------------------------------------------------------
 dea_profit <- function(x, y, w, r, data = NULL,
-                       direction = c("both", "in", "out", "unit", "mean"),
+                       direction = c("both", "in", "out", "unit", "mean", "range"),
                        rts = c("vrs", "nirs"),
                        peers = TRUE,
                        scaling = TRUE,
@@ -109,7 +109,7 @@ dea_profit <- function(x, y, w, r, data = NULL,
   n <- nrow(X); nr <- nrow(XR); p <- ncol(X); q <- ncol(Y)
   W <- .dea_prices(w, data, n, p, "w", colnames(X))
   R <- .dea_prices(r, data, n, q, "r", colnames(Y))
-  G <- .ddf_direction(direction, X, Y, n, p, q)
+  G <- .ddf_direction(direction, X, Y, XR, YR, n, p, q)
 
   ## max (r'Y' - w'X')lambda subject to the returns-to-scale row alone: the
   ## input and output constraints are what x and y were substituted out of.
@@ -149,7 +149,11 @@ dea_profit <- function(x, y, w, r, data = NULL,
   if (any(norm <= 0)) {
     stop("The direction has zero or negative value at ", sum(norm <= 0),
          " DMU(s): w'g_x + r'g_y must be strictly positive, since it is what ",
-         "the profit gap is measured in. Check the prices and the direction.",
+         "the profit gap is measured in. Check the prices and the direction. ",
+         "With direction = \"range\" this means a DMU that is already best in ",
+         "every input and every output, whose direction is zero by ",
+         "construction; dea_ddf() answers that DMU with beta = 0, but a ",
+         "Nerlovian measure has no units to report the profit gap in.",
          call. = FALSE)
   }
   nerl <- (profit_max - profit_obs) / norm

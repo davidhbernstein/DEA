@@ -1,5 +1,58 @@
 # DEA 1.0.3
 
+## The range directional model, and the DDF's first cross-package check
+
+`dea_ddf(direction = "range")` is the range directional model of Portela,
+Thanassoulis and Simpson (2004): the direction is the vector from each DMU to
+the *ideal point* of the reference set, the corner of its bounding box that is
+best in every coordinate at once. `dea_profit()` takes it too.
+
+It needed no new linear program — `dea_ddf()` already accepted a per-DMU
+direction matrix — and what it buys is two properties, both of which hold under
+`rts = "vrs"` and are tested as such:
+
+* **`beta` lies in `[0, 1]`** and reads as the fraction of the distance to the
+  ideal point the DMU could travel. Under variable returns `X'lambda` is a
+  convex combination of the reference inputs and cannot fall below their
+  minimum, which forces the bound.
+* **`beta` is translation invariant**, which is the reason to reach for this
+  model: negative inputs or outputs need no translation before fitting, and the
+  answer does not depend on one. The test asserts the crs half too — that the
+  invariance *fails* under a cone — because a one-sided test would pass just as
+  well if the invariance came from somewhere other than the `vrs` row.
+
+Three decisions that are not obvious:
+
+* **The range is taken over the reference set**, not the evaluated set, because
+  the reference DMUs span the technology and the `[0, 1]` bound is a statement
+  about that technology. `"mean"` still uses the evaluated set; it is only a
+  scale and nothing rests on which set it comes from.
+* **A DMU outside the reference set's box** — only reachable with a separate
+  `xref`/`yref` — has that coordinate's direction clamped to zero with a
+  warning, rather than pointing backwards and asking an input that already
+  beats the whole technology to grow.
+* **A DMU that IS the ideal point** gets `beta = 0` with no program solved and
+  `NA` peers, with a warning. Its direction is zero, so the program would be
+  *unbounded* rather than infeasible. `dea_profit()` cannot do the same: the
+  Nerlovian measure divides by `w'g_x + r'g_y`, which is zero there, and it now
+  says so.
+
+**And the directional model now has a cross-package reference, which it never
+had.** `tests/testthat/reference/ddf_Benchmarking.csv` pins
+`Benchmarking::dea.direct()` for four directions against four technologies, 640
+values, agreeing to 3e-12. That gap mattered more here than anywhere else in
+the package, because the direction is an *argument*: a misread convention would
+show up in no other model. Two of `dea.direct()`'s own conventions had to be
+pinned by measurement first — `objval` is beta and `eff` is not, and
+`ORIENTATION = "in-out"` is the general direction, while `"in"` and `"out"`
+zero half the direction whatever `DIRECT` says.
+
+The design behind those values is one where every restriction binds against
+*both* of its neighbours. The first one tried sat entirely in the
+decreasing-returns region, where `nirs` collapses onto `crs` and `ndrs` onto
+`vrs`, so half the technologies were never separately exercised while a
+`vrs`-only gate passed anyway.
+
 ## `?dea_boot` on the cost of `B`, and on where these intervals are calibrated
 
 Two documentation corrections, both from measuring rather than reasoning.

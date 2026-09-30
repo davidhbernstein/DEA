@@ -237,6 +237,64 @@ for (rts in c("crs", "vrs")) for (ori in c("none", "in", "out")) {
 }
 wr(do.call(rbind, rows), "sbm_DJL.csv")
 
+## --- directional distance, four directions x four technologies --------------
+## The DDF had no cross-package reference at all until now, which is the one
+## model here where that gap mattered most: its direction is an argument, so a
+## misreading of the direction convention would show up nowhere else. The
+## comparison is Benchmarking::dea.direct(), and two things about it had to be
+## pinned by measurement before any number below meant anything.
+##
+##   1. `objval` IS beta. `eff` is something else -- for ORIENTATION = "in" it
+##      is an n x p matrix of per-input Farrell ratios, which happens to equal
+##      1 - beta when DIRECT = X and does not in general. Reading `eff` gives
+##      numbers near 1 that look like efficiencies and are not this estimand.
+##   2. ORIENTATION = "in-out" is the general direction. "in" and "out" hold
+##      the other half of the direction at zero regardless of what DIRECT says,
+##      so passing a full (p+q) direction with ORIENTATION = "in" silently
+##      measures a different program.
+##
+## The design is chosen so that every technology BINDS, and binds against BOTH
+## of its neighbours: for every direction, nirs and ndrs each differ from vrs
+## and from crs on at least 11 of the 40 DMUs. Where a restriction does not
+## bind, all four technologies agree and the comparison proves nothing -- the
+## same rule test-multipliers.R and horserace/validate_feature_adapters.R
+## follow, and it is asserted below rather than assumed. Checking only against
+## vrs is not enough: on a design sitting entirely in the decreasing-returns
+## region, nirs collapses onto crs and ndrs onto vrs, so half the technologies
+## are never separately exercised while a vrs-only gate still passes. The first
+## design tried here did exactly that.
+d <- toy_(40, 2, 2, 12, returns = 0.8)
+alias <- c(crs = "crs", vrs = "vrs", nirs = "drs", ndrs = "irs")
+rng <- cbind(sweep(d$x, 2L, apply(d$x, 2L, min), "-"),
+             -sweep(d$y, 2L, apply(d$y, 2L, max), "-"))
+rows <- list()
+bind <- list()
+for (dir in c("both", "in", "out", "range")) {
+  G <- if (identical(dir, "range")) rng else
+       .ddf_direction(dir, d$x, d$y, d$x, d$y, nrow(d$x), ncol(d$x), ncol(d$y))
+  for (rts in names(alias)) {
+    th <- suppressWarnings(
+      Benchmarking::dea.direct(d$x, d$y, DIRECT = G, RTS = alias[[rts]],
+                               ORIENTATION = "in-out"))
+    ours <- suppressWarnings(
+      dea_ddf(d$x, d$y, direction = dir, rts = rts, peers = FALSE)$beta)
+    .agree(ours, th$objval, 1e-7, paste("ddf", dir, rts))
+    bind[[paste(dir, rts)]] <- as.numeric(th$objval)
+    rows[[length(rows) + 1L]] <- data.frame(
+      direction = dir, rts = rts, dmu = seq_along(th$objval),
+      beta = as.numeric(th$objval), stringsAsFactors = FALSE)
+  }
+}
+for (dir in c("both", "in", "out", "range")) {
+  for (rr in c("nirs", "ndrs")) for (ref in c("vrs", "crs")) {
+    k <- sum(abs(bind[[paste(dir, rr)]] - bind[[paste(dir, ref)]]) > 1e-8)
+    if (k < 5)
+      stop("ddf ", dir, "/", rr, " against ", ref, ": they differ on only ", k,
+           " DMUs, so this design cannot tell the technologies apart.")
+  }
+}
+wr(do.call(rbind, rows), "ddf_Benchmarking.csv")
+
 ## --- multiplier weights, crs input-oriented ---------------------------------
 ## NOTE THE FIELD NAMES. Benchmarking::dea(DUAL = TRUE) returns `ux` for the
 ## INPUT weights and `vy` for the OUTPUT weights -- the reverse of this

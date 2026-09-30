@@ -36,7 +36,7 @@
 ## ---------------------------------------------------------------------------
 
 dea_ddf <- function(x, y, data = NULL,
-                    direction = c("both", "in", "out", "unit", "mean"),
+                    direction = c("both", "in", "out", "unit", "mean", "range"),
                     rts = c("vrs", "crs", "nirs", "ndrs"),
                     peers = TRUE,
                     scaling = TRUE,
@@ -59,7 +59,7 @@ dea_ddf <- function(x, y, data = NULL,
   }
   dmu <- d$dmu
 
-  G <- .ddf_direction(direction, X, Y, n, p, q)
+  G <- .ddf_direction(direction, X, Y, XR, YR, n, p, q)
   sc  <- .dea_scale(XR, YR, scaling && all(XR > 0) && all(YR > 0))
   XRs <- sc$X; YRs <- sc$Y
   Xs  <- sweep(X, 2L, sc$sx, "/"); Ys <- sweep(Y, 2L, sc$sy, "/")
@@ -101,9 +101,31 @@ dea_ddf <- function(x, y, data = NULL,
     lpSolveAPI::set.rhs(lp, c(Xs[o, ], Ys[o, ]), seq_len(p + q))
   }
 
+  ## Under direction = "range" a DMU can BE the ideal point, in which case its
+  ## direction is zero and the program is unbounded rather than infeasible --
+  ## beta appears in no constraint. The answer is beta = 0 and needs no LP: the
+  ## DMU dominates the whole reference set, so there is nothing to improve
+  ## toward. Peers are left NA rather than faked, because no program was solved
+  ## and a lambda of all zeros would violate the vrs row.
+  ideal <- attr(G, "ideal")
+  if (is.null(ideal)) ideal <- logical(n)
+  if (any(ideal)) {
+    warning(sum(ideal), " DMU(s) attain the best value in EVERY input and ",
+            "output of the reference set (first: ",
+            paste(utils::head(which(ideal), 5), collapse = ", "),
+            "), so they are the range direction's ideal point. Their beta is 0 ",
+            "with no program to solve, and their peers are reported as NA.",
+            call. = FALSE)
+  }
+
   beta <- numeric(n); st <- integer(n)
   L <- if (peers) matrix(0, n, nr) else NULL
   for (o in seq_len(n)) {
+    if (ideal[o]) {
+      beta[o] <- 0; st[o] <- 0L
+      if (peers) L[o, ] <- NA_real_
+      next
+    }
     aim(lp, o)
     st[o] <- solve(lp)
     ## An INFEASIBLE program (2) is not retried: that is an answer about the
@@ -132,7 +154,10 @@ dea_ddf <- function(x, y, data = NULL,
                        requires = "some convex combination of the reference DMUs")
   beta[is.finite(beta) & abs(beta) < .DEA_CONSTANTS$TOL_EFF] <- 0
   names(beta) <- dmu
-  if (!is.null(L)) { L[abs(L) < .DEA_CONSTANTS$TOL_LAMBDA] <- 0; dimnames(L) <- list(dmu, d$ref) }
+  if (!is.null(L)) {
+    L[!is.na(L) & abs(L) < .DEA_CONSTANTS$TOL_LAMBDA] <- 0
+    dimnames(L) <- list(dmu, d$ref)
+  }
   dimnames(G) <- list(dmu, c(colnames(X), colnames(Y)))
 
   structure(list(
@@ -158,16 +183,27 @@ dea_ddf <- function(x, y, data = NULL,
 ## Build the n x (p+q) direction matrix.  A character shorthand expands to one
 ## row per DMU; a numeric vector is one fixed direction shared by all of them;
 ## a matrix is taken as given.
-.ddf_direction <- function(direction, X, Y, n, p, q) {
+##
+## "range" is the odd one out and deliberately so: it is the only shorthand
+## taken over the REFERENCE set rather than the evaluated set.  That is not a
+## stylistic choice.  The range direction points at the technology's ideal
+## point, and it is the reference DMUs that span the technology, so under vrs
+## the bound X'lambda >= min(XR) gives beta <= 1 for free -- the property the
+## model exists for.  Measured against the evaluated set it would not hold
+## whenever the two sets differ.  "mean" keeps using the evaluated set because
+## it is only a scale and nothing depends on which set it comes from.
+.ddf_direction <- function(direction, X, Y, XR, YR, n, p, q) {
   if (is.character(direction)) {
-    direction <- .match_arg_ci(direction, c("both", "in", "out", "unit", "mean"),
+    direction <- .match_arg_ci(direction,
+                               c("both", "in", "out", "unit", "mean", "range"),
                                "direction")
     G <- switch(direction,
       both = cbind(X, Y),
       `in` = cbind(X, matrix(0, n, q)),
       out  = cbind(matrix(0, n, p), Y),
       unit = matrix(1, n, p + q),
-      mean = matrix(rep(c(colMeans(X), colMeans(Y)), each = n), n, p + q))
+      mean = matrix(rep(c(colMeans(X), colMeans(Y)), each = n), n, p + q),
+      range = .ddf_range_direction(X, Y, XR, YR, n, p, q))
   } else if (is.matrix(direction) || is.data.frame(direction)) {
     G <- as.matrix(direction)
     if (nrow(G) != n || ncol(G) != p + q) {
@@ -187,8 +223,15 @@ dea_ddf <- function(x, y, data = NULL,
          "\"mean\", or a numeric vector/matrix.", call. = FALSE)
   }
   if (any(!is.finite(G))) stop("`direction` contains non-finite values.", call. = FALSE)
-  if (any(rowSums(abs(G)) <= 0)) {
-    bad <- which(rowSums(abs(G)) <= 0)
+  ## An all-zero row is fatal in general -- there is no distance to measure
+  ## along -- but under "range" it is not an error at all, it is the ideal
+  ## point, and dea_ddf() answers those DMUs without an LP. See
+  ## .ddf_range_direction().
+  ideal <- attr(G, "ideal")
+  zero <- rowSums(abs(G)) <= 0
+  if (!is.null(ideal)) zero <- zero & !ideal
+  if (any(zero)) {
+    bad <- which(zero)
     stop("`direction` is all zero for DMU(s) ", paste(utils::head(bad, 5), collapse = ", "),
          ". A zero direction has no distance to measure along; this usually ",
          "means direction = \"out\" was used on a DMU whose outputs are all 0.",
@@ -199,5 +242,64 @@ dea_ddf <- function(x, y, data = NULL,
             "way improvement lies, so a negative input entry asks for the ",
             "input to GROW; check this is intended.", call. = FALSE)
   }
+  G
+}
+
+## The range direction of Portela, Thanassoulis and Simpson (2004):
+##
+##   g_o = (x_o - min XR,  max YR - y_o)
+##
+## the vector from the DMU to the technology's IDEAL POINT, the corner of the
+## reference set's bounding box that is best in every coordinate at once. Two
+## properties follow, and both are worth being precise about because both are
+## vrs properties and neither survives a cone.
+##
+## BETA LIES IN [0, 1]. Under vrs, X'lambda is a convex combination of the
+## reference inputs, so X'lambda >= min XR componentwise; feasibility then
+## forces x_o - beta g_x >= min XR, i.e. beta <= 1, and the same argument on
+## the output side. So beta reads directly as "the fraction of the distance to
+## the ideal point that this DMU could travel". Under crs, nirs or ndrs the
+## convex-combination bound is gone -- lambda can scale a reference DMU past
+## the box -- and beta can exceed 1. That is not a bug in the model, it is the
+## bound being a statement about the technology rather than about the
+## direction, and ?dea_ddf says so.
+##
+## AND BETA IS TRANSLATION INVARIANT, which is the reason the model exists.
+## Adding a constant to an input column leaves g unchanged (it is a difference
+## of two values in that column) and shifts both sides of the constraint by
+## t * sum(lambda) -- equal only when sum(lambda) = 1. So translation
+## invariance is exactly the vrs case too, and it is what lets negative data be
+## handled without translating it at all.
+.ddf_range_direction <- function(X, Y, XR, YR, n, p, q) {
+  lo <- apply(XR, 2L, min)
+  hi <- apply(YR, 2L, max)
+  gx <- sweep(X, 2L, lo, "-")
+  gy <- -sweep(Y, 2L, hi, "-")
+
+  ## An evaluated DMU can sit outside the reference set's box when xref/yref
+  ## are supplied separately; self-referenced, this never fires. A negative
+  ## component would ask an input that is already better than anything in the
+  ## technology to GROW, so it is clamped to zero -- that coordinate simply has
+  ## no room to improve toward. Clamping is announced, because it changes the
+  ## estimand for those DMUs and silence would hide that.
+  out <- rowSums(gx < 0) + rowSums(gy < 0)
+  if (any(out > 0)) {
+    who <- which(out > 0)
+    warning(length(who), " DMU(s) lie outside the reference set's range in at ",
+            "least one coordinate (first: ", paste(utils::head(who, 5), collapse = ", "),
+            "). Those coordinates are already better than anything the ",
+            "technology contains, so their direction components are clamped to ",
+            "zero rather than pointing backwards.", call. = FALSE)
+    gx[gx < 0] <- 0
+    gy[gy < 0] <- 0
+  }
+
+  G <- cbind(gx, gy)
+  ## A DMU that attains the minimum in EVERY input and the maximum in EVERY
+  ## output is the ideal point itself. Its direction is zero, and the program
+  ## would be unbounded rather than infeasible -- beta does not appear in any
+  ## constraint. It is also, by construction, the answer: there is nowhere to
+  ## improve toward, so beta = 0. dea_ddf() fills those in without solving.
+  attr(G, "ideal") <- rowSums(abs(G)) <= 0
   G
 }
