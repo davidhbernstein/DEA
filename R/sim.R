@@ -257,7 +257,27 @@ dea_sim <- function(n, p = 1L, q = 1L,
   ## The real guard on the geometry is which facets BIND, not whether the
   ## normals are distinct: a facet that is never the minimum contributes
   ## nothing, and `m` would then overstate the shape being studied.
-  if (length(unique(k)) < m) {
+  ##
+  ## Only worth saying when the sample could actually show it. Each facet takes
+  ## roughly n/m of the DMUs (measured: 27-35% each at m = 4, p = 3), so below
+  ## about 20 per facet a missing one is a sampling accident and not a fact
+  ## about the geometry -- at n < m it is arithmetically impossible for all m to
+  ## appear, and the warning would then be guaranteed false. That threshold is
+  ## load-bearing: dea_sim(5, frontier = "facet", frontier_par = 4) would
+  ## otherwise warn about a shortfall that is pure arithmetic.
+  ##
+  ## THE WARNING ITSELF IS UNREACHABLE THROUGH dea_sim() AS IT STANDS, and that
+  ## is worth writing down so nobody spends an afternoon trying to trigger it.
+  ## Inputs are uniform on [lo, hi]^p, a box symmetric about the diagonal. Write
+  ## x = lo + eU with U uniform on [0,1]^p; since every normal sums to p,
+  ## a_k'x = p*lo + e * a_k'U, so argmin_k a_k'x = argmin_k a_k'U -- independent
+  ## of e. Which facet binds depends only on the DIRECTION of the deviation from
+  ## the diagonal, never on its size, so narrowing the support does not
+  ## concentrate the sample onto one facet: measured, all four still bind at
+  ## x_range = c(1, 1.0001). The guard is kept for the input design this
+  ## function does not yet have -- per-input ranges, or a non-uniform draw --
+  ## where a facet genuinely could go unvisited.
+  if (nrow(X) >= 20L * m && length(unique(k)) < m) {
     warning("frontier = \"facet\" asked for ", m, " facets but only ",
             length(unique(k)), " bind anywhere in this sample, so the ",
             "geometry is simpler than `frontier_par` says. Check $facet.",
