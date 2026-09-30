@@ -1,5 +1,30 @@
 # DEA 1.0.3
 
+## `?dea_boot` on the cost of `B`, and on where these intervals are calibrated
+
+Two documentation corrections, both from measuring rather than reasoning.
+
+**Cost is not linear in `B`.** `?dea_boot` said "cost is linear in `B` and the
+whole run is `B` times the cost of one fit". It is not: the original fit and the
+reference technology are computed once and do not scale with `B`. Measured over
+300 replications, that fixed part is about half the cost of a `B = 200` run and
+four independent implementations agree on it, so raising `B` tenfold costs about
+five times the time rather than ten. The help now says so, in both places it had
+the old claim. An earlier 30-replication measurement read as linear; medians
+taken under different machine load are not comparable.
+
+**The frontier/interior split is where this implementation's calibration lies,
+so the help now gives the numbers.** `?dea_boot` already said coverage should be
+judged separately for frontier and interior units. On a variable-returns design
+with two inputs and one output, at 300 replications, these intervals cover 0.887
+of the frontier units against 0.593 of the interior ones at n = 50, and 0.829
+against 0.723 at n = 200, nominal 0.95. The frontier figure is the best of the
+four implementations raced in the development repository's harness; the interior
+figure is not. A single averaged coverage number hides that, which is the reason
+the split was worth documenting in the first place.
+
+No code changed.
+
 ## Free disposal now reports an unsolved DMU as unsolved
 
 Reported by GitHub Copilot on issue #1, and confirmed: `rts = "fdh"` returned

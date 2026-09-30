@@ -22,7 +22,11 @@ dea_boot(object, B = 2000, alpha = 0.05,
 (no \code{xref}), not a super-efficiency or free-disposal-hull fit. For the
 \code{print} method, an object of class \code{"dea_boot"}.}
 \item{B}{Bootstrap replications. 2000 is the usual recommendation; each one
-costs a full DEA sweep, so the run is \code{B} times the cost of the fit.}
+costs a full DEA sweep. The run is not quite \code{B} times the cost of the
+fit, because the original fit and the reference technology are computed once
+and do not scale with \code{B}: measured, that fixed part is about half the
+cost of a \code{B = 200} run, so ten times the replications costs about five
+times the time rather than ten.}
 \item{alpha}{One minus the nominal coverage of the interval.}
 \item{bw}{Bandwidth for the kernel smoothing, as a rule name or a positive
 number. \code{"silverman"} is the robust normal-reference rule Simar and Wilson
@@ -182,12 +186,24 @@ estimator of a distance to the true frontier, so there is no bias to correct.
 efficient is one-sided, and intervals are hardest exactly there. Coverage
 should be judged separately for frontier and interior units rather than
 averaged; the harness in \code{horserace/} of the package's development
-repository reports the split for that reason.
+repository reports the split for that reason, and the split is where this
+implementation's calibration actually lies. On a variable-returns design with
+two inputs and one output, 300 replications at \code{B = 200}, these intervals
+cover 0.887 of the frontier units and 0.593 of the interior ones at n = 50, and
+0.829 against 0.723 at n = 200, against a nominal 0.95. The frontier coverage
+is the best of the four implementations raced; the interior coverage is not.
+Read a single averaged coverage number for this or any other implementation
+with that in mind.
 
 \strong{Choosing \code{B}.} 2000 is the usual recommendation. Interval
 endpoints are sample quantiles, so a small \code{B} interpolates the tails from
-few order statistics. Cost is linear in \code{B} and the whole run is \code{B}
-times the cost of one fit.
+few order statistics, and going from 200 to 2000 is worth about +0.008 in
+coverage here -- real, measured over 300 replications on paired data, and small
+next to how far every implementation of this procedure sits below nominal. Cost
+is affine rather than linear in \code{B}: the original fit and the reference
+technology are computed once, and on the measured design they account for about
+half of a \code{B = 200} run, so raising \code{B} tenfold costs about five
+times the time.
 }
 
 \references{
