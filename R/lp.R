@@ -385,34 +385,48 @@
     stop("rts = \"", rts, "\" has no multiplier form here.", call. = FALSE))
 }
 
-.lp_mult_build <- function(XR, YR, rts, orientation) {
+## `restrict`, when given, is the weight-restriction block: a list with `mat`
+## (k x (p+q), inputs then outputs, already in the SOLVER's units), `type` and
+## `rhs`. Its rows go after the technology rows, so nothing that indexes a
+## technology row by `j + 1L` has to change -- including the super-efficiency
+## relaxation in .lp_mult_at(). u0 never appears in a restriction: a bound on
+## the returns-to-scale intercept is a statement about the technology, not
+## about relative worth, and the rts argument is where that belongs.
+.lp_mult_build <- function(XR, YR, rts, orientation, restrict = NULL) {
   nr <- nrow(XR); p <- ncol(XR); q <- ncol(YR)
   b0 <- .mult_u0_bounds(rts, orientation)
   has0 <- !is.null(b0)
   nv <- p + q + has0
-  lp <- lpSolveAPI::make.lp(1L + nr, nv)
+  k <- if (is.null(restrict)) 0L else nrow(restrict$mat)
+  R <- if (k) restrict$mat else matrix(0, 0L, p + q)
+  lp <- lpSolveAPI::make.lp(1L + nr + k, nv)
   lpSolveAPI::lp.control(lp, sense = if (orientation == "in") "max" else "min",
                          epsel = .DEA_CONSTANTS$LP_EPSEL, verbose = "neutral")
 
   ## Row 1 is the normalization and is rewritten per DMU; rows 2..(nr+1) are
-  ## the reference technology and are written once, here.
+  ## the reference technology and are written once, here; the rest, if any, are
+  ## the weight restrictions and never move either.
   if (orientation == "in") {
-    for (i in seq_len(p)) lpSolveAPI::set.column(lp, i,      c(0, -XR[, i]))
-    for (r in seq_len(q)) lpSolveAPI::set.column(lp, p + r,  c(0,  YR[, r]))
-    if (has0) lpSolveAPI::set.column(lp, nv, c(0, rep(-1, nr)))
-    lpSolveAPI::set.constr.type(lp, c("=", rep("<=", nr)))
+    for (i in seq_len(p)) lpSolveAPI::set.column(lp, i,      c(0, -XR[, i], R[, i]))
+    for (r in seq_len(q)) lpSolveAPI::set.column(lp, p + r,  c(0,  YR[, r], R[, p + r]))
+    if (has0) lpSolveAPI::set.column(lp, nv, c(0, rep(-1, nr), rep(0, k)))
+    lpSolveAPI::set.constr.type(lp, c("=", rep("<=", nr)), seq_len(1L + nr))
   } else {
-    for (i in seq_len(p)) lpSolveAPI::set.column(lp, i,      c(0,  XR[, i]))
-    for (r in seq_len(q)) lpSolveAPI::set.column(lp, p + r,  c(0, -YR[, r]))
-    if (has0) lpSolveAPI::set.column(lp, nv, c(0, rep(-1, nr)))
-    lpSolveAPI::set.constr.type(lp, c("=", rep(">=", nr)))
+    for (i in seq_len(p)) lpSolveAPI::set.column(lp, i,      c(0,  XR[, i], R[, i]))
+    for (r in seq_len(q)) lpSolveAPI::set.column(lp, p + r,  c(0, -YR[, r], R[, p + r]))
+    if (has0) lpSolveAPI::set.column(lp, nv, c(0, rep(-1, nr), rep(0, k)))
+    lpSolveAPI::set.constr.type(lp, c("=", rep(">=", nr)), seq_len(1L + nr))
   }
-  lpSolveAPI::set.rhs(lp, c(1, rep(0, nr)))
+  if (k) {
+    lpSolveAPI::set.constr.type(lp, restrict$type, 1L + nr + seq_len(k))
+    lpSolveAPI::set.rhs(lp, restrict$rhs, 1L + nr + seq_len(k))
+  }
+  lpSolveAPI::set.rhs(lp, c(1, rep(0, nr)), seq_len(1L + nr))
   if (has0) {
     lpSolveAPI::set.bounds(lp, lower = b0[1L], upper = b0[2L], columns = nv)
   }
   list(lp = lp, nref = nr, p = p, q = q, nv = nv, has0 = has0,
-       rts = rts, orientation = orientation)
+       nrestrict = k, rts = rts, orientation = orientation)
 }
 
 .lp_mult_at <- function(M, X, Y, o, exclude = NULL) {

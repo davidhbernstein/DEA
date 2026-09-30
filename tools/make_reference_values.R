@@ -239,6 +239,43 @@ for (rts in c("crs", "vrs")) for (ori in c("none", "in", "out")) {
 }
 wr(do.call(rbind, rows), "sbm_DJL.csv")
 
+## --- weight restrictions, against Benchmarking::dea.dual --------------------
+## Benchmarking's DUAL argument takes only one shape of restriction -- ratios
+## against the FIRST input and the FIRST output -- so it checks the assurance
+## region case and nothing else. That is still the case worth checking against
+## an independent implementation, because it is the one where a row of the
+## multiplier program can be written with the wrong sign and still produce
+## plausible numbers.
+##
+## WHICH ROW IS WHICH WAS PINNED BY MEASUREMENT, with deliberately asymmetric
+## bounds so the two readings cannot both fit: row 1 is the input ratio
+## v[2]/v[1] and row 2 the output ratio u[2]/u[1]. Reading them the other way
+## round moves the scores by 0.30 on this design, and the restriction binds by
+## 0.32 against an unrestricted fit -- so this comparison can fail, which is
+## the only kind worth recording.
+d <- toy_(30, 2, 2, 8)
+DU <- matrix(c(0.3, 0.8,
+               1.2, 4.0), nrow = 2L, byrow = TRUE)
+rows <- list()
+for (ori in c("in", "out")) {
+  th <- Benchmarking::dea.dual(d$x, d$y, RTS = "crs", ORIENTATION = ori,
+                               DUAL = DU)
+  rs <- c(wr_ratio("v", 2, 1, lower = DU[1, 1], upper = DU[1, 2]),
+          wr_ratio("u", 2, 1, lower = DU[2, 1], upper = DU[2, 2]))
+  ours <- suppressWarnings(
+    dea_wr(d$x, d$y, rs, rts = "crs", orientation = ori)$eff)
+  .agree(ours, as.numeric(th$eff), 1e-7, paste("weight restrictions", ori))
+  free <- dea(d$x, d$y, rts = "crs", orientation = ori, slack = FALSE)$eff
+  if (max(abs(as.numeric(th$eff) - free)) < 0.02)
+    stop("weight restrictions ", ori, ": the restriction barely binds on this ",
+         "design, so the comparison cannot distinguish a right implementation ",
+         "from a wrong one.")
+  rows[[length(rows) + 1L]] <- data.frame(
+    orientation = ori, dmu = seq_along(th$eff),
+    eff = as.numeric(th$eff), stringsAsFactors = FALSE)
+}
+wr(do.call(rbind, rows), "weights_Benchmarking.csv")
+
 ## --- the Malmquist index, against TWO packages, and a convention they split on
 ## Two references rather than one, because they DISAGREE and the disagreement
 ## is the thing that had to be settled.

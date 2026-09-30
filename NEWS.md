@@ -1,5 +1,59 @@
 # DEA 1.0.3
 
+## Weight restrictions, assurance regions and the cone-ratio model
+
+`dea_wr()`, with restrictions built by `wr_bound()` (Dyson and Thanassoulis
+1988), `wr_ratio()` (assurance regions, Thompson et al. 1986) and `wr_linear()`
+(Wong and Beasley 1990), combined with `c()`. And `dea_cone()`, the cone-ratio
+model of Charnes et al. (1989).
+
+**It is a separate function rather than an argument to `dea()`, and the reason
+is the part worth reading.** With restrictions imposed the envelopment and
+multiplier forms stop being interchangeable. Strong duality still holds, but
+the dual of the restricted multiplier program is not the ordinary envelopment
+program: it carries one extra non-negative term per restriction, entering the
+constraints in exactly the place a slack does. Those residue terms are not
+slacks, and the `lambda` beside them does not project the DMU onto a point of
+the technology.
+
+So `dea_wr()` returns the score and the weights and nothing else. `peers()` and
+`slacks()` on the result **raise an error that explains why**, rather than
+returning something plausible. Passing all this through `dea()` would have
+meant one object where `$lambda` sometimes means what it says and sometimes
+does not.
+
+With `restrictions = NULL` the two forms can still be compared, and the tests
+assert they agree across all four technologies and both orientations. That is
+the anchor that makes the restricted results believable.
+
+Three things checked because they could fail quietly:
+
+* **Restrictions are in the caller's units.** The solver divides each column by
+  its mean, so a restriction's coefficients are divided by the same factors on
+  the way in. Getting that wrong imposes a different restriction without
+  erroring, so the test requires the restricted score to be identical with
+  `scaling` on and off, and to follow a change of units.
+* **A restriction can only make a DMU look worse** — the input-oriented
+  maximum falls, the output-oriented minimum rises. A restriction that improved
+  a score would mean a row written with the wrong sign.
+* **`dea_cone()` and `dea_wr()` agree where both can express the same cone.**
+  They are not wrappers for each other: one transforms the *data* and calls
+  `dea()`, the other adds *rows* to the multiplier program, and the bridge
+  between them is the polar cone. On a binding case they agree to 1e-12.
+
+**Restrictions are also the one place a DEA program here can be infeasible on
+ordinary data**: ask for weights no price vector satisfies and there is no
+answer. Those DMUs are `NA` with a warning that points at the restrictions
+rather than at the data, because an unrestricted fit of the same data cannot
+fail that way.
+
+Cross-checked against `Benchmarking::dea.dual()`, which takes ratios against
+the first input and the first output. **Which of its rows is which was pinned
+by measurement**, with deliberately asymmetric bounds so the two readings could
+not both fit — reading them the other way round moves the scores by 0.30 — and
+the reference design is one where the restriction binds by 0.32, so the
+comparison can fail.
+
 ## Panel data, and the Malmquist productivity index
 
 `dea_panel()` and `dea_malmquist()`. The index is Fare, Grosskopf, Norris and

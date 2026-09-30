@@ -41,6 +41,9 @@ When they are not, and the efficient set is too large to rank:
   answer that is otherwise not reproducible across solvers.}
   \item{\code{\link{multipliers}}}{the optimal weights themselves, from the
   multiplier form of any radial fit.}
+  \item{\code{\link{dea_wr}}, \code{\link{dea_cone}}}{weight restrictions,
+  assurance regions and the cone-ratio model, for when the freedom to choose
+  any prices at all is the problem.}
 }
 and, because a DEA score is an estimate and not a measurement,
 \describe{
