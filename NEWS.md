@@ -1,5 +1,71 @@
 # DEA 1.0.3
 
+## Undesirable outputs, and the precondition the usual route does not state
+
+`dea_undesirable()`. A bad output --- pollution, defects, non-performing loans,
+mortality --- is not an output: free disposal runs the wrong way for it, so
+listing it in `y` asks the technology to let a unit produce *more* of it and
+rewards a unit for doing so. Two routes, both of which reduce to `dea()` on
+rearranged data:
+
+* `method = "translate"`, Seiford and Zhu (2002): replace `b` by `w - b` so that
+  more is better, then run the ordinary program.
+* `method = "input"`, Hailu and Veeman (2001): put the bad among the inputs. No
+  constant, no invariance, every technology and orientation. What it does not
+  encode is null-jointness, and that is said rather than glossed.
+
+**The translate route is valid in exactly one cell, and the function refuses the
+rest.** `w` is arbitrary, so the answer only means something where the model is
+invariant to translating that output. Running this transformation at
+`w = max(b)+1, 20, 100, 1000` on a 40-DMU design, the largest change in any
+DMU's score:
+
+| rts | input | output |
+|---|---|---|
+| vrs | **7.0e-11** | 2.5e-01 |
+| crs | 1.8e-02 | 2.6e-02 |
+| nirs | 4.0e-03 | 2.5e-01 |
+| ndrs | 1.8e-02 | 2.6e-02 |
+
+Eight orders of magnitude between the one valid cell and every other, so this is
+not a tolerance question — and not "a convex technology" either, since `nirs` is
+convex and moves by 4e-3. `deaR::undesirable_basic`'s help says `rts` must be
+`vrs` and says nothing about the orientation, which is the half of the
+precondition that bites hardest: studying outputs is exactly when a reader
+reaches for an output orientation. So `rts` and `orientation` other than `vrs`
+and `in` are **refused** under this method, the way `dea_profit()` refuses a
+cone.
+
+**The second precondition is numerical, and its failure is silent.** A large `w`
+makes the transformed column nearly constant, and after scaling to mean one its
+values differ only in the last digits. Writing `rel` for the relative spread
+`range(b)/mean(w - b)`:
+
+| `rel` | largest score change | DMUs unsolved |
+|---|---|---|
+| 1.4e+00 (default) | — | 0 |
+| 7.7e-04 | 1.7e-08 | 0 |
+| 7.7e-06 | 2.5e-06 | 1 |
+| 7.7e-07 | 0.188 | 3 |
+| 7.7e-09 | 0.188 | **0** |
+
+The last row is why this is gated: every program reports a clean optimum, nothing
+is `NA`, nothing warns anywhere else, and the scores are wrong by 0.188 — the
+same shape as the `set.column()` trap in the LP layer. A relative spread below
+1e-3 now warns; the default never triggers it.
+
+`slack_bad` is the reducible bad output in the caller's own units under *both*
+routes, which is a piece of good luck worth stating: under the translate route
+the output slack on `w - b` satisfies `b_peer = b_o - s`, so the slack is the
+reduction itself with no sign flip, and under the input route it is an input
+slack on `b`, the same quantity.
+
+No cross-package reference values for this one: `deaR` is the only CRAN package
+with the feature and cannot be loaded on the development machine, since it
+imports `rgl`, which needs `libGLU` from X11. So the checks are the translation
+invariance itself, equivalence to transforming by hand and calling `dea()`, and
+a monotonicity — a cleaner DMU is never scored worse.
+
 ## A test of returns to scale, and a reason not to run it input-oriented
 
 `dea_rts_test()`, the nonparametric test of Simar and Wilson (2002).
