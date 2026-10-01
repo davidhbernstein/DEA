@@ -1,5 +1,67 @@
 # DEA 1.0.3
 
+## Subsampling intervals: the m out of n bootstrap
+
+`dea_subsample()` (Simar and Wilson 2011). `dea_boot()` resamples all *n*
+observations, and for a boundary estimator that is not known to be consistent —
+the score's limiting distribution is driven by how many observations land near
+the frontier, and an *n*-out-of-*n* resample reproduces the sample's own boundary
+rather than the population's. Subsampling draws *m* < *n* without replacement,
+rescales by the convergence rate `dea_rate()` already knows, and inverts.
+
+It also covers the case `dea_boot()` refuses. Free disposal has no smoothed
+homogeneous bootstrap — the hull is not convex — and `dea_boot()` stopped with a
+pointer to "the subsampling bootstrap of Jeong and Simar (2006), which is not
+implemented here." It now is, and that message points at it.
+
+### Does it cover better? At n = 200 yes, at n = 50 no, and never at the frontier
+
+100 replications against `dea_sim()`'s closed-form truth, output-oriented
+variable returns, nominal 95%, both methods on the same fit every replication:
+
+| | coverage | frontier | interior | width |
+|---|---|---|---|---|
+| n = 50, `dea_boot` | 0.814 | 0.794 | 0.819 | 0.170 |
+| n = 50, `dea_subsample` | 0.811 | **0.602** | 0.871 | 0.157 |
+| n = 200, `dea_boot` | 0.879 | 0.710 | 0.897 | 0.089 |
+| n = 200, `dea_subsample` | **0.925** | 0.695 | **0.950** | 0.097 |
+
+At n = 200 the gain is +0.046 with a paired standard error of 0.0047 (*t* = 9.8),
+and **interior coverage reaches 0.950 against a nominal 0.95** — the package's
+largest documented inference weakness closed rather than narrowed. At n = 50 the
+difference is −0.003 and does not resolve: subsampling needs the sample size that
+`m → ∞` with `m/n → 0` asks for.
+
+**It never helps the frontier DMUs**, and that is the method's own cost rather
+than an implementation problem. Scoring an observation against a *subsample* can
+be infeasible — the point lies outside the smaller hull — and the burden falls
+on exactly the units an analyst cares about:
+
+| | m = n^0.4 | m = n^0.6 | m = n^0.8 |
+|---|---|---|---|
+| n = 60, all DMUs | 31.3% | 15.7% | 6.3% |
+| n = 60, **called efficient** | **58.1%** | 39.2% | 22.1% |
+| n = 60, interior | 26.5% | 11.5% | 3.5% |
+
+The worst single DMU lost 97% of its draws, and a smaller *m* makes this worse at
+exactly the rate that makes the asymptotics better. So `n_valid` is reported per
+DMU, an interval needs `ceiling(2/alpha)` valid draws or it comes back `NA` with
+a warning naming the count, and `?dea_subsample` states the recommendation
+narrowly: interior DMUs, a few hundred observations or more.
+
+**Choosing m is the whole difficulty**, and the minimum-volatility rule of
+Politis, Romano and Wolf is used. Only candidates with a *full* window are
+eligible: a clipped window averages over fewer neighbours, and a standard
+deviation over fewer points is smaller for reasons unconnected to stability, so
+clipping biases the rule toward the extreme *m*. Observed before the fix — the
+rule picked the first grid point at volatility 0.0107 over a mid-grid candidate
+at 0.0109, purely because one was scored on four neighbours and the other on
+seven. Politis, Romano and Wolf choose *m* for one parameter where there are *n*
+intervals here, so the volatility is computed on the mean endpoints and one *m*
+serves all; `m_grid`, `endpoint_path` and `volatility` are returned and
+`summary()` prints the path, because that aggregation is a choice the method does
+not make.
+
 ## Weak disposability, the one undesirable-output model that encodes null-jointness
 
 `dea_weak()`, the directional distance function on the weak-disposability

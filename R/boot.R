@@ -56,8 +56,8 @@ dea_boot <- function(object, B = 2000, alpha = 0.05,
   if (identical(object$rts, "fdh")) {
     stop("The Simar-Wilson (1998) homogeneous bootstrap is built for the ",
          "convex DEA estimator. Under free disposal the relevant scheme is ",
-         "the subsampling bootstrap of Jeong and Simar (2006), which is not ",
-         "implemented here.", call. = FALSE)
+         "the subsampling bootstrap of Jeong and Simar (2006): use ",
+         "dea_subsample(), which accepts this fit.", call. = FALSE)
   }
   if (!is.numeric(B) || length(B) != 1L || B < 2) {
     stop("`B` must be a single number of bootstrap replications, at least 2.",

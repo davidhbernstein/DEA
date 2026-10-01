@@ -223,7 +223,10 @@ Jeong, S.-O. and Simar, L. (2006). Linearly interpolated FDH efficiency score
 for nonconvex frontiers. \emph{Journal of Multivariate Analysis} 97,
 2141--2161.
 }
-\seealso{\code{\link{dea}}, \code{\link{dea_rate}}}
+\seealso{\code{\link{dea_subsample}} for the m out of n alternative, which is
+what free disposal needs and what Simar and Wilson (2011) recommend when the
+full-sample bootstrap's consistency is in doubt; \code{\link{dea}},
+\code{\link{dea_rate}}}
 \examples{
 sim <- dea_sim(40, p = 1, q = 1, seed = 3)
 fit <- dea(sim$x, sim$y, rts = "vrs", orientation = "in")

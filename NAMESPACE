@@ -1,7 +1,7 @@
 export(dea, dea_sbm, dea_ddf, dea_add, dea_rts, dea_rts_test, dea_boot,
        dea_sim, dea_rate,
        dea_panel, dea_malmquist, dea_wr, dea_cone, dea_reg, dea_undesirable,
-       dea_mult, dea_categorical, dea_nd, dea_weak,
+       dea_mult, dea_categorical, dea_nd, dea_weak, dea_subsample,
        wr_bound, wr_ratio, wr_linear,
        dea_cost, dea_revenue, dea_profit, dea_cross,
        efficiency, peers, slacks, multipliers)
@@ -81,6 +81,8 @@ S3method(summary, dea_rts)
 S3method(print,   dea_rts_test)
 S3method(summary, dea_rts_test)
 S3method(nobs,    dea_rts_test)
+S3method(print,   dea_subsample)
+S3method(summary, dea_subsample)
 S3method(print,   dea_boot)
 S3method(summary, dea_boot)
 S3method(print,   dea_sim)
