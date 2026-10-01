@@ -17,6 +17,10 @@ result object:
   unweighted or as the Range Adjusted Measure.}
   \item{\code{\link{dea_rts}}}{scale efficiency and the returns-to-scale
   classification.}
+  \item{\code{\link{dea_mult}}}{the multiplicative, or piecewise
+  Cobb-Douglas, model -- a log-linear envelope and a geometric peer target
+  rather than a linear one and an arithmetic target. No other package on CRAN
+  has it.}
   \item{\code{\link{dea_undesirable}}}{efficiency when some outputs are bad,
   by the Seiford-Zhu transformation or by treating them as inputs -- with the
   models the first of those is not valid for refused rather than served.}

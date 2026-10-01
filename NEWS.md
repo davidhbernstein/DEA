@@ -1,5 +1,79 @@
 # DEA 1.0.3
 
+## The multiplicative model: a Cobb-Douglas envelope, and when not to use it
+
+`dea_mult()`, the multiplicative or piecewise Cobb-Douglas model of Charnes,
+Cooper, Seiford and Stutz (1982, 1983). **No other package on CRAN implements
+it.**
+
+Every other estimator here builds its technology from convex combinations, so
+the frontier is piecewise linear and a peer target is an arithmetic average.
+That is an assumption about the production function, usually made silently. This
+one makes the other assumption — the target is a weighted *geometric* mean,
+`prod_j x_ij^lambda_j`, so each facet is a Cobb-Douglas function whose exponents
+are estimated rather than imposed. It needs no new solver: taking logs turns a
+product into a sum, so the program is the unweighted additive model on
+`log(x)`, `log(y)`. The slacks are then log ratios, and `ratio_x` and `ratio_y`
+report their exponentials — the factor each input or output could be multiplied
+by — so nobody has to remember to exponentiate.
+
+**Units invariance needs `rts = "vrs"`**, because multiplying a column by *c*
+translates it in log space and translation invariance of the additive model (Ali
+and Seiford 1990) needs the convexity row. The mean objective with one input
+column multiplied by *c*:
+
+| rts | c = 1 | c = 10 | c = 1000 |
+|---|---|---|---|
+| vrs | 0.370673 | 0.370673 | 0.370673 |
+| crs | 0.441869 | 0.950590 | 2.187686 |
+| nirs | 0.424713 | 0.949094 | 2.187686 |
+
+Under `crs` the answer moves by a factor of five although nothing was done but
+record an input in different units: without the convexity row the log-space
+technology is a cone through the point `x = y = 1`, which has no meaning and
+moves whenever a unit changes. The other technologies still run, with a warning,
+because `crs` is the published 1982 model and the 1983 paper's title says what it
+was written to fix. That is the opposite of the choice in `dea_undesirable()`,
+where the invalid combinations are refused — there nobody had proposed them.
+
+**And `rts` does not mean returns to scale here.** It is a restriction on
+`sum(lambda)` in *log* space. `"vrs"` does give a variable-returns Cobb-Douglas
+envelope; `"crs"` does not give a constant-returns technology in the original
+space.
+
+### The bias runs the other way when the technology is not log-convex
+
+This is the thing to understand before reaching for it. DEA's whole inferential
+story rests on the estimated frontier lying *inside* the true one — that is the
+bias `dea_boot()` corrects. For this model that holds only if the technology is
+**log-convex**, which ordinary convexity does not imply. For a linear frontier
+`f = 0.5x1 + 0.5x2`, `log f(e^z)` is log-sum-exp, which is convex, so the log
+chord runs *above* the surface: between `x = (2,9)` and `(9,2)` the chord gives
+5.50 where the truth is 4.24 — 30% high, with no estimator involved.
+
+Measured in `horserace/multiplicative_experiment.R`, which asks both envelopes
+for `max{y : (x0,y) in T}` at the same fixed interior grid so that only the
+envelope differs, 100 replications at n = 150:
+
+| true shape | envelope | signed shortfall | % of points above the truth |
+|---|---|---|---|
+| cobb | log-convex | 0.0089 | 0.0 |
+| cobb | convex | 0.0211 | 0.0 |
+| linear | log-convex | **−0.0804** | **97.1** |
+| linear | convex | 0.0091 | 0.0 |
+| ces | log-convex | 0.0174 | 0.0 |
+| ces | convex | 0.0239 | 0.0 |
+
+On a genuinely Cobb-Douglas technology the log-convex envelope is 2.4 times
+tighter and still inside; on CES, which is neither shape, 1.4 times tighter and
+still inside. On a linear technology it sits above the truth at 97% of points —
+and it gets worse with n, from −0.046 at n = 80 to −0.080 at n = 150, because the
+estimate is converging to the log-convex hull of the technology, which strictly
+contains it. More data makes it more confidently wrong.
+
+So this is a maintained hypothesis about the production function, not a drop-in
+alternative, and `?dea_mult` says so.
+
 ## Undesirable outputs, and the precondition the usual route does not state
 
 `dea_undesirable()`. A bad output --- pollution, defects, non-performing loans,
