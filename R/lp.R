@@ -102,11 +102,14 @@
 ## was found in the stage-one program of the same sweep, and a guard that exists
 ## only where the bug has already been seen is a guard against the past.
 .lp_slack_solve <- function(S, XRs, YRs, rts, rhs_x, rhs_y) {
+  ## The rebuilds must carry the same objective mask, or a retry would answer a
+  ## different question from the first attempt.
+  nd_x <- S$nd_x; nd_y <- S$nd_y
   z <- .lp_slack_at(S, rhs_x, rhs_y)          # the hot path, as above
   if (z$status %in% c(0L, 1L)) return(z)
   ok <- function(z) z$status %in% c(0L, 1L)
   fresh <- function(mode = NULL) {
-    S2 <- .lp_slack_build(XRs, YRs, rts)
+    S2 <- .lp_slack_build(XRs, YRs, rts, nd_x, nd_y)
     if (!is.null(mode)) invisible(lpSolveAPI::lp.control(S2$lp, scaling = mode))
     S2
   }
@@ -126,7 +129,8 @@
 ## `B` is the ONE object built outside the caller's loop and reused across every
 ## DMU -- that reuse is where this package's speed comes from, so the first
 ## attempt must use it and only a failure may rebuild.
-.lp_radial_solve <- function(B, XRs, YRs, rts, orientation, Xs, Ys, o, exclude) {
+.lp_radial_solve <- function(B, XRs, YRs, rts, orientation, Xs, Ys, o, exclude,
+                             fixed = NULL) {
   ## The first attempt is the hot path -- it runs n times per fit and succeeds
   ## essentially always -- so it is written without the helper closures below
   ## rather than constructing them once per DMU for nothing. That is tidiness,
@@ -135,7 +139,7 @@
   ## note here claimed 5.6%, which was an artifact of always timing the old
   ## package first -- whichever of the two ran second measured slower, in both
   ## orders.
-  r <- .lp_radial_at(B, Xs, Ys, o, exclude = exclude)
+  r <- .lp_radial_at(B, Xs, Ys, o, exclude = exclude, fixed = fixed)
   if (r$status %in% c(0L, 1L, 2L)) return(r)
   ok <- function(r) r$status %in% c(0L, 1L, 2L)
   fresh <- function(mode = NULL) {
@@ -143,10 +147,10 @@
     if (!is.null(mode)) invisible(lpSolveAPI::lp.control(B2$lp, scaling = mode))
     B2
   }
-  r <- .lp_radial_at(fresh(), Xs, Ys, o, exclude = exclude)
+  r <- .lp_radial_at(fresh(), Xs, Ys, o, exclude = exclude, fixed = fixed)
   if (ok(r)) return(r)
   for (mode in .DEA_CONSTANTS$LP_SCALING_FALLBACK) {
-    r <- .lp_radial_at(fresh(mode), Xs, Ys, o, exclude = exclude)
+    r <- .lp_radial_at(fresh(mode), Xs, Ys, o, exclude = exclude, fixed = fixed)
     if (ok(r)) return(r)
   }
   r
@@ -197,7 +201,15 @@
 ## can be genuinely INFEASIBLE -- a DMU at the boundary of the input space may
 ## have no other DMU able to dominate it -- and the honest answer there is NA,
 ## not a large number.  See ?dea, section 'super-efficiency'.
-.lp_radial_at <- function(B, X, Y, o, exclude = NULL) {
+## `fixed` marks NON-DISCRETIONARY rows on the oriented side: a logical of
+## length p input-oriented, of length q output-oriented. Those rows keep
+## constraining the comparison set but theta does not multiply them, so the row
+## reads sum(lambda_j x_ij) <= x_io rather than <= theta x_io. In the program
+## that is two changes together -- a zero in the theta column and the DMU's own
+## level moved into the right-hand side, which the build left at 0 -- and doing
+## only the first would quietly impose x_ij <= 0. NULL is the ordinary model and
+## touches nothing.
+.lp_radial_at <- function(B, X, Y, o, exclude = NULL, fixed = NULL) {
   lp <- B$lp; p <- B$p; q <- B$q
   ## The 0 index is the objective row. lpSolveAPI's set.column REPLACES the
   ## whole column, objective coefficient included, so omitting it silently
@@ -205,11 +217,26 @@
   ## status 0 (optimal) and a feasible-but-arbitrary theta. Nothing errors;
   ## the scores are simply wrong.
   if (B$orientation == "in") {
-    lpSolveAPI::set.column(lp, 1L, c(1, -X[o, ]), c(0L, seq_len(p)))
+    co <- -X[o, ]
+    if (!is.null(fixed)) co[fixed] <- 0
+    lpSolveAPI::set.column(lp, 1L, c(1, co), c(0L, seq_len(p)))
     lpSolveAPI::set.rhs(lp, Y[o, ], p + seq_len(q))
+    ## Written every time rather than only for the fixed rows: the object is
+    ## reused across DMUs, so a level left behind by the previous one would be
+    ## applied to this one.
+    if (!is.null(fixed)) {
+      rx <- numeric(p); rx[fixed] <- X[o, fixed]
+      lpSolveAPI::set.rhs(lp, rx, seq_len(p))
+    }
   } else {
-    lpSolveAPI::set.column(lp, 1L, c(1, -Y[o, ]), c(0L, p + seq_len(q)))
+    co <- -Y[o, ]
+    if (!is.null(fixed)) co[fixed] <- 0
+    lpSolveAPI::set.column(lp, 1L, c(1, co), c(0L, p + seq_len(q)))
     lpSolveAPI::set.rhs(lp, X[o, ], seq_len(p))
+    if (!is.null(fixed)) {
+      ry <- numeric(q); ry[fixed] <- Y[o, fixed]
+      lpSolveAPI::set.rhs(lp, ry, p + seq_len(q))
+    }
   }
   if (!is.null(exclude)) lpSolveAPI::set.bounds(lp, upper = 0, columns = exclude + 1L)
   st <- solve(lp)
@@ -240,7 +267,12 @@
 ##
 ## Variables: lambda (n), s_minus (p), s_plus (q).
 ## ---------------------------------------------------------------------------
-.lp_slack_build <- function(X, Y, rts) {
+## `nd_x`/`nd_y` drop a slack from the OBJECTIVE while leaving it in the
+## constraints, which is what makes a variable non-discretionary at the second
+## stage: the DMU gets no credit for a reduction it cannot make, but the row
+## still has to balance. Both sides are maskable in both orientations -- the
+## orientation decides which side stage ONE scales, not which slacks count.
+.lp_slack_build <- function(X, Y, rts, nd_x = NULL, nd_y = NULL) {
   n <- nrow(X); p <- ncol(X); q <- ncol(Y)
   rr <- .rts_row(rts)
   nrows <- p + q + (!is.null(rr))
@@ -260,8 +292,10 @@
     lpSolveAPI::set.rhs(lp, 1, p + q + 1L)
   }
   obj <- c(rep(0, n), rep(1, p + q))
+  if (!is.null(nd_x)) obj[n + which(nd_x)] <- 0
+  if (!is.null(nd_y)) obj[n + p + which(nd_y)] <- 0
   lpSolveAPI::set.objfn(lp, obj)
-  list(lp = lp, n = n, p = p, q = q)
+  list(lp = lp, n = n, p = p, q = q, nd_x = nd_x, nd_y = nd_y)
 }
 
 .lp_slack_at <- function(S, xo, yo) {

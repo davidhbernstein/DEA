@@ -141,8 +141,18 @@ dea <- function(x, y, data = NULL,
 ## The LP sweep, in scaled coordinates.  Kept separate from dea() so that
 ## dea_boot() can call it directly on resampled reference sets without
 ## re-validating the data B times.
+## `nd` is NULL for the ordinary model, or a list of two logicals naming the
+## NON-DISCRETIONARY inputs and outputs. It reaches both stages and means
+## something slightly different in each, which is the part worth reading twice:
+## at stage one only the ORIENTED side is scaled, so only that side's mask
+## changes the radial score; at stage two both masks apply, because a slack the
+## DMU cannot act on should earn it no credit whichever way the program is
+## oriented. See ?dea_nd.
 .dea_radial <- function(Xs, Ys, XRs, YRs, rts, orientation, super, slack,
-                        peers, n, nr, p, q) {
+                        peers, n, nr, p, q, nd = NULL) {
+  fixed <- if (is.null(nd)) NULL else
+    if (identical(orientation, "in")) nd$x else nd$y
+  if (!is.null(fixed) && !any(fixed)) fixed <- NULL
   B   <- .lp_radial_build(XRs, YRs, rts, orientation)
   eff <- numeric(n); st <- integer(n)
   L   <- if (peers) matrix(0, n, nr) else NULL
@@ -163,7 +173,7 @@ dea <- function(x, y, data = NULL,
     ## rebuild alone cannot help -- a fresh object failed five times out of five
     ## on the same program. See .lp_solve_retry().
     r <- .lp_radial_solve(B, XRs, YRs, rts, orientation, Xs, Ys, o,
-                          exclude = if (super) o else NULL)
+                          exclude = if (super) o else NULL, fixed = fixed)
     eff[o] <- r$eff; st[o] <- r$status
     suml[o] <- if (all(is.na(r$lambda))) NA_real_ else sum(r$lambda)
     if (peers) L[o, ] <- r$lambda
@@ -175,12 +185,20 @@ dea <- function(x, y, data = NULL,
   ## statement about the observed technology.
   sx <- sy <- NULL
   if (slack && !super) {
-    S  <- .lp_slack_build(XRs, YRs, rts)
+    S  <- .lp_slack_build(XRs, YRs, rts, nd$x, nd$y)
     sx <- matrix(0, n, p); sy <- matrix(0, n, q)
     for (o in seq_len(n)) {
       if (!is.finite(eff[o])) { sx[o, ] <- NA_real_; sy[o, ] <- NA_real_; next }
       rhs_x <- if (orientation == "in") eff[o] * Xs[o, ] else Xs[o, ]
       rhs_y <- if (orientation == "in") Ys[o, ] else eff[o] * Ys[o, ]
+      ## A non-discretionary row was never scaled by theta at stage one, so
+      ## stage two has to start from the DMU's own level rather than from the
+      ## radial projection. Using eff[o] * x here would ask the slack program to
+      ## reach a level the radial program never claimed was attainable.
+      if (!is.null(fixed)) {
+        if (orientation == "in") rhs_x[fixed] <- Xs[o, fixed]
+        else rhs_y[fixed] <- Ys[o, fixed]
+      }
       z <- .lp_slack_solve(S, XRs, YRs, rts, rhs_x, rhs_y)
       ## RETRY ON A FRESH LP. The single object is reused across all n DMUs and
       ## only its right-hand side is rewritten -- that is where this package's

@@ -1,5 +1,74 @@
 # DEA 1.0.3
 
+## Environments the DMU did not choose (Banker and Morey 1986a, 1986b)
+
+Two functions for the case where part of what a DMU is scored on is not its to
+choose — common in exactly the education and health applications DEA is most
+used for.
+
+**`dea_categorical()`** handles an environment that is *ordered* but is not a
+quantity: a deprivation band, a rurality class. "More deprived" is a rank, not a
+number of units of anything, so it cannot be added as an input. The fix is a
+restriction on who may be a peer and nothing else — a DMU in category *k* is
+scored against categories 1..*k*, which is `xref`/`yref` applied once per
+category. Two identities make the output readable: the top category's scores are
+exactly the pooled ones, and the bottom category's are exactly an ordinary fit on
+that subset.
+
+Banker and Morey's own mixed-integer formulation is **deliberately not built**.
+Charnes, Cooper, Lewin and Seiford (1994, ch. 3) are explicit that it
+"incorrectly prescribes categories that are undefined or meaningless"; adapting
+the solution procedure instead is correct and allows several categorical
+variables at once.
+
+Which end is which is asked for explicitly, because getting it backwards does not
+error — it silently answers the opposite question. An unordered factor is
+**refused**: alphabetical order is not an ordering of environments, and if the
+groups genuinely are not ordered (public vs private) the right analysis is a
+separate one per group. Nesting also costs sample size, and the cost falls
+entirely on category 1, which is scored against its own members alone; a design
+comfortable when pooled can fall well below `n >= 3(p+q)` once split, so that is
+warned about per category with the category named.
+
+**`dea_nd()`** handles a variable that is continuous but fixed: pupils a school
+is sent, a hospital's catchment. `theta` multiplies only the discretionary rows
+while the fixed ones stay at the DMU's own level, so a fixed input still
+constrains who may be a peer without the DMU being asked to cut it. In the
+program that is two edits together — a zero in the `theta` column and the DMU's
+own level moved into the right-hand side — and doing only the first would quietly
+impose `sum(lambda_j x_ij) <= 0`.
+
+The two stages mean different things, which is worth reading twice. Stage one
+scales only the oriented side, so only `nd_x` changes an input-oriented score.
+Stage two maximises a sum of slacks, and there *both* masks apply in *both*
+orientations, because a slack the DMU cannot act on should earn it no credit
+whichever way the program is oriented. That is Banker and Morey's own rule.
+
+### Fixing a variable makes the measured inefficiency larger, not smaller
+
+Every intuition says otherwise. `theta_nd <= theta_ordinary`, always: measured
+over 8704 DMU-fits across four technologies and random dimensions the largest
+excess was 1.2e-12, solver noise, and on the worked example the mean `theta`
+falls from 0.901 to 0.789. Output-oriented the mirror holds.
+
+For `theta < 1` the fixed row `sum(lambda_j x_ij) <= x_io` is *looser* than
+`<= theta x_io`, so the feasible set grows and the minimum falls. Economically,
+`theta` in the ordinary model is one proportional contraction of every input at
+once, so a peer must use proportionally less of everything — pupils included.
+Here a peer need only use no more pupils, and the whole contraction lands on the
+teachers. The two are not the same quantity measured more or less fairly; they
+answer different questions, and a table comparing them as if one corrected the
+other is comparing two estimands.
+
+**And non-discretionary outputs are not the mirror image.** "Non-discretionary
+input" means a quantity the DMU is handed. "Non-discretionary output" is usually
+used for something else — an output influenced only *indirectly*, through inputs,
+such as sales through advertising. That is controlled at one remove, not fixed,
+and marking it `nd_y` denies the DMU credit for producing more of it. Chapter 21
+of Charnes and others flags the confusion as a recurring interpretational error,
+so `dea_nd()` prints a message whenever `nd_y` is used rather than leaving it in
+the help.
+
 ## The multiplicative model: a Cobb-Douglas envelope, and when not to use it
 
 `dea_mult()`, the multiplicative or piecewise Cobb-Douglas model of Charnes,

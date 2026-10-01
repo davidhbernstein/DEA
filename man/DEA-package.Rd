@@ -17,6 +17,9 @@ result object:
   unweighted or as the Range Adjusted Measure.}
   \item{\code{\link{dea_rts}}}{scale efficiency and the returns-to-scale
   classification.}
+  \item{\code{\link{dea_categorical}}, \code{\link{dea_nd}}}{environments the
+  DMU did not choose: an ordered category becomes a nested reference set, and a
+  fixed input stops being something theta contracts.}
   \item{\code{\link{dea_mult}}}{the multiplicative, or piecewise
   Cobb-Douglas, model -- a log-linear envelope and a geometric peer target
   rather than a linear one and an arithmetic target. No other package on CRAN
