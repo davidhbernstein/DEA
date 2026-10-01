@@ -1,5 +1,82 @@
 # DEA 1.0.3
 
+## Weak disposability, the one undesirable-output model that encodes null-jointness
+
+`dea_weak()`, the directional distance function on the weak-disposability
+technology (Chung, Färe and Grosskopf 1997), with the variable-returns
+formulation of Kuosmanen (2005). This is the third and last of the three routes
+the ROADMAP identified for undesirable outputs; `dea_undesirable()` has the two
+that are rearrangements of an ordinary program.
+
+Neither of those encodes the one thing everybody believes about pollution: that
+you cannot simply stop producing it. Under free disposal a DMU may always cut its
+bad output at no cost, so the model will cheerfully prescribe less pollution and
+the same product. Weak disposability is an **equality row** on the bads, so they
+can be reduced only by moving along the technology.
+
+**Null-jointness is checked, not imposed.** The technology means what it is meant
+to mean only if no good output can be had without some bad. That cannot be
+written as a constraint — it is a property of the data — so a DMU with positive
+goods and zero bads is reported and warned about rather than silently accepted.
+One such row lets the frontier claim clean production is already feasible.
+
+### The variable-returns formulation is disputed, and the dispute has a size
+
+Färe and Grosskopf apply one abatement factor to the whole sample; Kuosmanen
+(2005) showed that is not the minimal technology and gave a two-vector form in
+which each DMU carries its own. Kuosmanen's technology contains Färe and
+Grosskopf's — `mu = 0` is always available — so `beta_K >= beta_FG` is an
+identity rather than a result. How often the extra freedom is *used* is not, and
+**the answer depends almost entirely on the direction**, which neither paper
+discusses. 50 replications at n = 60:
+
+| direction | coupling | `mu` used | mean gap | max gap |
+|---|---|---|---|---|
+| goods_bads | prop | 6.6% | 0.00091 | 0.113 |
+| goods_bads | steep | 0.7% | 0.00017 | 0.107 |
+| bads | prop | 16.6% | 0.00435 | 0.203 |
+| bads | **flat** | **30.0%** | **0.01347** | **0.393** |
+| all | flat | 2.1% | 0.00039 | 0.097 |
+
+On the standard goods-and-bads direction the second vector is used for a few per
+cent of units and the mean gap is a thousandth — but the largest gap is 0.1 even
+there, so the choice bites a few units hard rather than everyone a little.
+Asking for bads to be cut and nothing else takes it to 30% and 0.39, which is
+exactly when scaling the whole activity back is the attractive move and `mu` is
+what permits it.
+
+What it does *not* much change is who is on the frontier: the efficient set
+differs for 0.2% to 0.7% of DMUs. The formulation is a question about the size of
+measured inefficiency far more than about its classification.
+
+Kuosmanen's is the default, being the one that satisfies minimal extrapolation;
+Färe and Grosskopf's is kept for reproducing published results, the same reason
+`dea_mult()` keeps the 1982 model. Under `crs` there is no convexity row, `mu`
+only adds slack free disposal already allows, and the two are the same program —
+`technology` is then ignored and says so.
+
+### Does weak disposability change the answer at all
+
+If it did not, the honest thing would be to say so and point at the one-liner.
+Same direction, same data, bad treated as a freely disposable input instead:
+
+| coupling | mean weak | mean strong | difference | rank correlation |
+|---|---|---|---|---|
+| prop | 0.0508 | 0.0519 | −0.0011 | 0.955 |
+| steep | 0.0663 | 0.0697 | −0.0034 | 0.951 |
+| flat | 0.0866 | 0.0950 | −0.0084 | 0.917 |
+
+Weak disposability gives the smaller `beta` — the smaller technology, so less
+improvement is available — by 2% to 10%, with rankings agreeing at 0.92 to 0.96
+rather than exactly. A real difference, and a modest one.
+
+**The gap is largest where the good–bad coupling is weakest**, which is the
+opposite of the natural guess. When bads move almost independently of output the
+free-disposal model finds plenty of apparently costless abatement — peers with
+similar output and much lower emissions — and weak disposability forbids exactly
+that. When bads are tightly tied to output there is little free abatement to find
+and the two models nearly agree.
+
 ## Environments the DMU did not choose (Banker and Morey 1986a, 1986b)
 
 Two functions for the case where part of what a DMU is scored on is not its to

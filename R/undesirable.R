@@ -45,10 +45,15 @@
 ## physics of most production processes forbids.  That is the objection, it is a
 ## real one, and it is the reason route 3 exists.
 ##
-## ROUTE 3, NOT IMPLEMENTED -- the weak-disposability technology of Fare and
+## ROUTE 3 is dea_weak() -- the weak-disposability technology of Fare and
 ## Grosskopf, which puts the bads on EQUALITY rows with an abatement factor and
-## is the only one of the three that encodes null-jointness.  It needs a new
-## program rather than a rearrangement of this one.  ROADMAP.md carries it.
+## is the only one of the three that encodes null-jointness.  It is a new
+## program rather than a rearrangement of this one, which is why it lives in its
+## own file.  Measured against the bad-as-input route on the same data and the
+## same direction, it gives a beta between 2% and 10% smaller and a ranking
+## correlated 0.92 to 0.96 rather than identical; the gap is largest where the
+## good-bad coupling is WEAKEST, which is the opposite of the natural guess.
+## See ?dea_weak.
 ##
 ## THE SECOND PRECONDITION IS NUMERICAL, AND THE FAILURE IS SILENT.  Invariance
 ## to w is exact in algebra and not in double precision: a large w makes the

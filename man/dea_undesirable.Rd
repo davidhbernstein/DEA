@@ -63,10 +63,10 @@ the program is free to recommend less bad at no cost in good output, which the
 physics of most production forbids. That objection is real, and it is why the
 third route exists.
 
-Not implemented: the weak-disposability technology of Fare and Grosskopf, which
-puts the bads on equality rows with an abatement factor and is the only one of
-the three that encodes null-jointness. It needs a new program rather than a
-rearrangement of this one.
+The third route, the weak-disposability technology of Fare and Grosskopf, puts
+the bads on equality rows with an abatement factor and is the only one of the
+three that encodes null-jointness. It needs a new program rather than a
+rearrangement of this one, and is \code{\link{dea_weak}}.
 }
 \section{Why the translate route refuses most models}{
 \eqn{w} is arbitrary, so the answer is only meaningful where the model does not
@@ -119,8 +119,9 @@ Fare, R. and Grosskopf, S. (2004). Modeling undesirable factors in efficiency
 evaluation: comment. \emph{European Journal of Operational Research} 157,
 242--245.
 }
-\seealso{\code{\link{dea}}, \code{\link{dea_ddf}} for a directional measure that
-takes an arbitrary direction, \code{\link{dea_rts}}.}
+\seealso{\code{\link{dea_weak}} for the weak-disposability technology,
+\code{\link{dea}}, \code{\link{dea_ddf}} for a directional measure that takes an
+arbitrary direction.}
 \examples{
 set.seed(4)
 n <- 40

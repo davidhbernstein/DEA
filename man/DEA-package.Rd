@@ -24,6 +24,9 @@ result object:
   Cobb-Douglas, model -- a log-linear envelope and a geometric peer target
   rather than a linear one and an arithmetic target. No other package on CRAN
   has it.}
+  \item{\code{\link{dea_weak}}}{the weak-disposability technology, where a bad
+  output can be reduced only by scaling the activity back -- the one route of
+  the three that encodes null-jointness.}
   \item{\code{\link{dea_undesirable}}}{efficiency when some outputs are bad,
   by the Seiford-Zhu transformation or by treating them as inputs -- with the
   models the first of those is not valid for refused rather than served.}
