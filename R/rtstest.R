@@ -24,6 +24,18 @@
 ## They are not the same number and need not even move together -- the first
 ## weights a DMU by its own level, the second does not.
 ##
+## MEASURED, THE MEAN OF RATIOS IS THE BETTER ONE, and by a long way.  On
+## dea_sim(returns = 1), where H0 is exactly true, the two have size 0.050 and
+## 0.025 at n = 60 against a nominal 0.05; at returns = 0.6 they have power 0.780
+## and 0.155, a paired difference of -0.625 with t = -18.2.  Both are reported
+## because Simar and Wilson give both and because that is one design, but nothing
+## measured recommends the ratio of means.  horserace/README.md has the table,
+## including the two cells where this package does not come out well: the size is
+## conservative rather than nominal and becomes more so with n, and the power
+## against a 20% departure from constant returns is 2.0%, which is BELOW the
+## size.  rDEA sits at 3.5% on the same datasets, so that is the 2002 procedure
+## and not this implementation of it.
+##
 ## THE ORIENTATION, AND WHY `s` IS WRITTEN RATHER THAN `theta`.  `s` is the
 ## score on the package's common (0, 1] scale: theta input-oriented, 1/phi
 ## output-oriented, which is what efficiency(fit, "score") already returns.

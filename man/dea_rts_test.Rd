@@ -123,6 +123,36 @@ rather than at \code{alpha}. With \code{h0 = "nirs"} the per-DMU test applied to
 the scale-inefficient DMUs is what distinguishes decreasing from increasing
 returns.
 }
+\section{How well it works, measured}{
+\code{dea_sim(returns = 1)} draws a cone, so H0 is exactly true and the size of
+the test can be measured rather than assumed. Rejection rate at a nominal 5\%,
+output oriented, \code{B = 400}, 200 replications (100 at \eqn{n = 150}):
+\tabular{lrrrr}{
+                   	ab n=60, r=1 	ab n=150, r=1 	ab n=60, r=0.8 	ab n=60, r=0.6 \cr
+ratio of means     	ab 0.025 	ab 0.000 	ab 0.020 	ab 0.155 \cr
+mean of ratios     	ab 0.050 	ab 0.010 	ab 0.185 	ab 0.780 \cr
+\code{rDEA}        	ab 0.025 	ab 0.000 	ab 0.035 	ab 0.175 \cr
+\code{npsf}        	ab 0.315 	ab 0.240 	ab 0.680 	ab 0.990
+}
+Three things to take from it.
+
+\strong{Prefer \code{mean_of_ratios}.} It dominates on this design, 0.780 against
+0.155 at \eqn{r = 0.6} with a paired \eqn{t} of \eqn{-18.2}, at a size no worse.
+Both are reported because Simar and Wilson give both and because this is one
+design, but nothing measured recommends the ratio of means.
+
+\strong{The size is conservative, not nominal, and the power is low.} At
+\eqn{r = 0.8} the ratio of means rejects 2.0\% of the time, below its own size; at
+\eqn{r = 0.6} --- an elasticity of scale of 0.6, which is not subtle --- 15.5\%.
+\code{rDEA::rts.test} sits at 3.5\% and 17.5\% on the same datasets, so this is
+the 2002 procedure and not this implementation of it. Do not read a failure to
+reject as evidence for constant returns at these sample sizes.
+
+\strong{\code{npsf::nptestrts}'s columns are not comparable.} It rejects a true
+null 31.5\% of the time, because it draws a fresh pseudo-sample inside its DMU
+loop, so its apparently higher power is the same miscalibration seen from the
+other side.
+}
 \section{What this test cannot be asked}{
 \strong{On a bounded input support the input-oriented version of this test is not
 valid, and no bootstrap repairs it.} The variable-returns program cannot put

@@ -126,10 +126,37 @@ where input-oriented it holds at 0.362, 0.340, 0.338. Neither
 `npsf::nptestrts` nor `rDEA::rts.test` reports anything of the kind, and both
 will run the input-oriented test on such a design without comment.
 
-Not implemented: Simar and Wilson (2011) show the full-sample bootstrap used
-here is not consistent for tests of this kind and propose an *m* out of *n*
-subsampling alternative. `?dea_rts_test` says so; this function is the 2002
-procedure, which is what both CRAN packages provide.
+**The size of the test, measured against a known truth.** `dea_sim(returns = 1)`
+is a cone, so H0 is exactly true. Rejection rate at a nominal 5%, output
+oriented, B = 400, from `horserace/rts_test_experiment.R`:
+
+| | n = 60, r = 1 (size) | n = 150, r = 1 (size) | n = 60, r = 0.8 | n = 60, r = 0.6 |
+|---|---|---|---|---|
+| ratio of means | 0.025 | 0.000 | 0.020 | 0.155 |
+| mean of ratios | 0.050 | 0.010 | 0.185 | 0.780 |
+| `rDEA::rts.test` | 0.025 | 0.000 | 0.035 | 0.175 |
+| `npsf::nptestrts` | **0.315** | **0.240** | 0.680 | 0.990 |
+
+`npsf::nptestrts` rejects a true null 31.5% of the time, which was predicted from
+its source before the run rather than found afterwards: it draws a fresh
+pseudo-sample inside its DMU loop, so a replication averages over *n* independent
+pseudo-samples instead of one and its null distribution is too narrow. Its power
+columns are therefore not comparable to the others.
+
+**Two things in that table are not flattering and are why it is here.** Size is
+*conservative* rather than nominal and becomes more so with n, and power is low:
+at `returns = 0.8` the ratio of means rejects 2.0%, below its own size, and at
+`returns = 0.6` only 15.5%. `rDEA` sits at 3.5% and 17.5% on the same datasets,
+so this is the Simar and Wilson (2002) procedure rather than this implementation.
+Of the two statistics the **mean of ratios** dominates on this design — 0.780
+against 0.155 at `returns = 0.6`, paired *t* = −18.2 — and nothing measured here
+recommends the ratio of means.
+
+Not implemented, and the table above is the measured case for it: Simar and
+Wilson (2011) show the full-sample bootstrap used here is not consistent for
+tests of this kind and propose an *m* out of *n* subsampling alternative.
+`?dea_rts_test` says so; this function is the 2002 procedure, which is what both
+CRAN packages provide.
 
 ## Two-stage efficiency regression, done the way Simar and Wilson say to
 
