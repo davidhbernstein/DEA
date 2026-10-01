@@ -150,6 +150,30 @@ Note that the classification depends on the orientation, and is meant to: it
 describes the frontier point a DMU is benchmarked against, and the two
 orientations project to different points.
 
+That table has no standard error in it. A DMU whose constant- and
+variable-returns scores differ by 0.001 is classified exactly as confidently as
+one whose scores differ by 0.4, and nothing in it says whether the *technology*
+may be taken to be a cone. `dea_rts_test()` answers that second question by
+bootstrap.
+
+```{r}
+dea_rts_test(x, y, orientation = "out", B = 200, seed = 1, progress = FALSE)
+```
+
+It does not reject, although this technology is not constant-returns ---
+`dea_sim()` drew it with `returns = 0.9`. That is a statement about power at
+n = 150 and a 10% departure, not a verdict, and it is the usual situation: these
+tests need either a large sample or a large departure.
+
+Two things to read before using it. The statistic lies in (0, 1] and the test
+rejects for **small** values, in both orientations. And the **output**
+orientation is not an arbitrary choice here: on a bounded input support the
+input-oriented version of this test is not valid at all, because the
+variable-returns program cannot reach an input level below the smallest one
+observed, so a large share of DMUs differ between the two technologies for a
+reason that has nothing to do with returns to scale. `?dea_rts_test` has the
+measured numbers and the per-DMU `reachable` flag that reports it.
+
 ## The part most DEA analyses leave out
 
 Every score above is biased. The estimated frontier is spanned by the observed

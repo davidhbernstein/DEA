@@ -18,7 +18,9 @@ Description: Nonparametric efficiency measurement by data envelopment analysis.
     result object.  Efficiency estimates are accompanied by peers, slacks,
     returns-to-scale classification, scale efficiency and the optimal
     multipliers, and by bias-corrected estimates and confidence intervals from
-    the smoothed homogeneous bootstrap of Simar and Wilson (1998).  Where
+    the smoothed homogeneous bootstrap of Simar and Wilson (1998), which also
+    supplies a test of constant returns to scale for the sample as a whole
+    (Simar and Wilson, 2002).  Where
     prices are known, cost, revenue and Nerlovian profit efficiency separate
     the technical component from the allocative one; where they are not,
     cross-efficiency with the secondary goals of Doyle and Green (1994) ranks

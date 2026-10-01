@@ -77,8 +77,11 @@ that matches the decision being made, and do not read the two tables against
 each other row by row.
 
 These are point estimates from an estimator with a known bias, and the
-classification inherits that. A formal test of constant returns needs a
-bootstrap; see Simar and Wilson (2002).
+classification inherits that: a DMU whose constant- and variable-returns scores
+differ by 0.001 is classified with exactly the confidence of one whose scores
+differ by 0.4. For a test of the sample as a whole, with a p-value attached, see
+\code{\link{dea_rts_test}} --- and read its warning about the input
+orientation, which applies to the \code{scale_eff} column here too.
 }
 \references{
 Coelli, T. J., Rao, D. S. P., O'Donnell, C. J. and Battese, G. E. (1998).
@@ -90,7 +93,8 @@ Fare, R., Grosskopf, S. and Lovell, C. A. K. (1994).
 Simar, L. and Wilson, P. W. (2002). Non-parametric tests of returns to scale.
 \emph{European Journal of Operational Research} 139, 115--132.
 }
-\seealso{\code{\link{dea}}, \code{\link{dea_boot}}}
+\seealso{\code{\link{dea_rts_test}} for the bootstrap test,
+\code{\link{dea}}, \code{\link{dea_boot}}}
 \examples{
 sim <- dea_sim(80, p = 1, q = 1, returns = 0.7, seed = 2)
 r <- dea_rts(sim$x, sim$y)

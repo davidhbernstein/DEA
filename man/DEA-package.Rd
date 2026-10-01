@@ -52,6 +52,9 @@ and, because a DEA score is an estimate and not a measurement,
   \item{\code{\link{dea_reg}}}{the two-stage regression of Simar and Wilson
   (2007), for when efficiency is to be explained by covariates -- the place
   applied DEA most often goes wrong.}
+  \item{\code{\link{dea_rts_test}}}{the test of constant returns for the
+  sample as a whole, by the bootstrap of Simar and Wilson (2002), where
+  \code{dea_rts()} only classifies.}
   \item{\code{\link{dea_rate}}}{the rate at which any of this can converge,
   which depends on the number of inputs and outputs and is never
   root-\eqn{n}.}

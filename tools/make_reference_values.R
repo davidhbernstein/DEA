@@ -43,7 +43,7 @@
 ## ---------------------------------------------------------------------------
 
 if (!requireNamespace("pkgload", quietly = TRUE)) stop("needs pkgload")
-for (p in c("Benchmarking", "DJL")) {
+for (p in c("Benchmarking", "DJL", "npsf", "rDEA")) {
   if (!requireNamespace(p, quietly = TRUE))
     stop("needs ", p, " installed to regenerate reference values")
 }
@@ -153,6 +153,7 @@ cat("Benchmarking ", as.character(packageVersion("Benchmarking")),
     " / productivity ", as.character(packageVersion("productivity")),
     " / truncreg ", as.character(packageVersion("truncreg")),
     " / npsf ", as.character(packageVersion("npsf")),
+    " / rDEA ", as.character(packageVersion("rDEA")),
     "\n", sep = "")
 
 ## ---------------------------------------------------------------------------
@@ -495,6 +496,122 @@ pr <- do.call(rbind, rows)
 pr$profit_max_vrs <- NA_real_
 pr$profit_max_vrs[pr$rts == "vrs"] <- as.numeric(rowSums(po$yopt * P) - rowSums(po$xopt * W))
 wr(pr, "price_Benchmarking.csv")
+
+## --- the returns-to-scale test statistic, against BOTH packages that have one
+## What is pinned here is the OBSERVED statistic, not the p-value. The p-value
+## comes from a bootstrap and is a random quantity whose seed no two packages
+## share; the statistic is a deterministic function of the data, so it is the
+## part that can be pinned and the part that a misread definition would move.
+##
+## INPUT ORIENTED, all three agree exactly, on both aggregations and under both
+## nulls -- `rDEA::rts.test`'s `w_hat` and `w48_hat + 1`, and
+## `npsf::nptestrts`'s `sefficiencyMean` and `mean(sefficiency)`, with
+## `nrsOVERvrsMean` and `mean(nrsOVERvrs)` for the non-increasing null.
+##
+## OUTPUT ORIENTED THEY SPLIT, and the split is checked rather than assumed, as
+## in the Malmquist block. npsf aggregates the output measure on the phi scale;
+## this package and rDEA aggregate on the 1/phi scale. A mean does not commute
+## with a reciprocal, so npsf's number is NOT the reciprocal of ours and the
+## check below asserts that it is not -- a reciprocal relationship would mean
+## one of the two is doing something other than what it is documented to do.
+##
+## THE DESIGN MUST SEPARATE THE TWO NULLS FROM EACH OTHER AND FROM VRS, which is
+## the rule the DDF block records one level further in. A statistic of 1 under
+## the non-increasing null means nirs has collapsed onto vrs; a statistic equal
+## to the crs one means it has collapsed onto crs. Either way the nirs rows are
+## the crs rows under another name. Both margins are gated, at 0.02.
+##
+## IT TAKES TWO DESIGNS, one per orientation, and the reason is the orientation
+## dependence that R/rts.R documents. dea_sim()'s frontier is homogeneous of
+## degree `returns`, so the technology is globally one-sided. Output oriented,
+## the classification describes the DMU's own scale, so under returns < 1 almost
+## everything is in the decreasing region and nirs collapses onto vrs: the best
+## single design found that separates both nulls in BOTH orientations clears the
+## gate by 0.004, which is not a margin. Searched separately, each orientation
+## has a comfortable one. One design serving both would have meant either a gate
+## loose enough to be decorative or output-oriented nirs rows that are the vrs
+## rows under another name.
+##
+## npsf's entry point walks the call stack to find its data, so it must be
+## called at top level -- not inside a function and not inside
+## suppressWarnings(). A `{` block and a `for` add no frame, so this is safe.
+rts_rows <- list()
+for (.k in 1:2) {
+  ori  <- c("in", "out")[.k]
+  nn   <- c(60L, 40L)[.k]
+  sdd  <- c(17L, 31L)[.k]
+  retn <- c(0.55, 0.50)[.k]
+  d <- toy_(nn, 2, 1, sdd, returns = retn)
+  Xr <- as.matrix(d$x); Yr <- as.matrix(d$y)
+  datr <- data.frame(y = Yr[, 1], x1 = Xr[, 1], x2 = Xr[, 2])
+  devnull <- tempfile()
+
+  ## B is irrelevant to the statistic; the warning about its size is not.
+  t_c <- suppressWarnings(dea_rts_test(Xr, Yr, orientation = ori, h0 = "crs",
+                                       B = 2, seed = 1, progress = FALSE))
+  t_n <- suppressWarnings(dea_rts_test(Xr, Yr, orientation = ori, h0 = "nirs",
+                                       B = 2, seed = 1, progress = FALSE))
+  rd <- rDEA::rts.test(Xr, Yr, model = if (ori == "in") "input" else "output",
+                       H0 = "constant", B = 100)
+  sink(devnull)
+  np <- npsf::nptestrts(y ~ x1 + x2, data = datr,
+                        base = if (ori == "in") "input" else "output",
+                        reps = 100, test.two = TRUE, print.level = 1, dots = FALSE)
+  sink(); unlink(devnull)
+
+  .agree(t_c$statistic[["ratio_of_means"]], rd$w_hat, 1e-9,
+         paste0("rts test, ", ori, ", crs, ratio of means (rDEA)"))
+  .agree(t_c$statistic[["mean_of_ratios"]], rd$w48_hat + 1, 1e-9,
+         paste0("rts test, ", ori, ", crs, mean of ratios (rDEA)"))
+  if (ori == "in") {
+    .agree(t_c$statistic[["ratio_of_means"]], np$sefficiencyMean, 1e-9,
+           "rts test, in, crs, ratio of means (npsf)")
+    .agree(t_c$statistic[["mean_of_ratios"]], mean(np$sefficiency), 1e-9,
+           "rts test, in, crs, mean of ratios (npsf)")
+    .agree(t_n$statistic[["ratio_of_means"]], np$nrsOVERvrsMean, 1e-9,
+           "rts test, in, nirs, ratio of means (npsf)")
+    .agree(t_n$statistic[["mean_of_ratios"]], mean(np$nrsOVERvrs), 1e-9,
+           "rts test, in, nirs, mean of ratios (npsf)")
+  } else {
+    ## The convention split, asserted in the direction that makes it a check:
+    ## the two numbers must NOT be reciprocals, and the gap must be far larger
+    ## than any tolerance that could hide it.
+    gap <- abs(t_c$statistic[["ratio_of_means"]] - 1 / np$sefficiencyMean)
+    if (gap < 1e-4)
+      stop("rts test: npsf's output-oriented statistic is the reciprocal of ",
+           "this package's to ", format(gap), ", so the two are NOT ",
+           "aggregating on different scales and this block's premise is wrong.")
+    cat(sprintf("    %-40s differ by %.2e as they must\n",
+                "rts test, out, npsf scale split", gap))
+  }
+
+  ## The separation gate.
+  n_vs_v <- sum(abs(t_n$eff_h0 - t_n$eff_vrs) > 1e-6)
+  n_vs_c <- sum(abs(t_n$eff_h0 - t_c$eff_h0) > 1e-6)
+  m_vrs <- 1 - t_n$statistic[["ratio_of_means"]]
+  m_crs <- t_n$statistic[["ratio_of_means"]] - t_c$statistic[["ratio_of_means"]]
+  if (n_vs_v < 5L || n_vs_c < 5L || m_vrs < 0.02 || m_crs < 0.02)
+    stop(sprintf(paste0("rts test, %s: the design does not separate the nulls. ",
+                        "nirs differs from vrs on %d DMUs and from crs on %d ",
+                        "(need 5 each); the nirs statistic is %.4f, which is ",
+                        "%.4f below 1 and %.4f above the crs statistic (need ",
+                        "0.02 each). On a design where nirs has collapsed onto ",
+                        "a neighbour the nirs rows check nothing."),
+                 ori, n_vs_v, n_vs_c, t_n$statistic[["ratio_of_means"]],
+                 m_vrs, m_crs))
+  cat(sprintf("    rts test, %-3s separation gate            nirs differs from vrs on %d and crs on %d DMUs\n",
+              ori, n_vs_v, n_vs_c))
+
+  rts_rows[[.k]] <- data.frame(
+    orientation = ori, n = nn, seed = sdd, returns = retn,
+    h0 = c("crs", "nirs"),
+    ratio_of_means = c(t_c$statistic[["ratio_of_means"]],
+                       t_n$statistic[["ratio_of_means"]]),
+    mean_of_ratios = c(t_c$statistic[["mean_of_ratios"]],
+                       t_n$statistic[["mean_of_ratios"]]),
+    stringsAsFactors = FALSE)
+}
+wr(do.call(rbind, rts_rows), "rts_test_reference.csv")
 
 ## --- the charnes1981 data set ----------------------------------------------
 ## Not a model comparison: this checks that the copy this package SHIPS still

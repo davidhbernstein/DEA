@@ -197,7 +197,9 @@
     stop("`", what, "` must be a single value; got ", length(arg), ".", call. = FALSE)
   }
   a <- tolower(as.character(arg))
-  if (identical(what, "rts") && a %in% names(.RTS_ALIAS)) a <- .RTS_ALIAS[[a]]
+  ## "h0" names a technology too -- dea_rts_test(h0 = "drs") must mean the
+  ## same restriction as rts = "drs" and not an unrecognised choice.
+  if (what %in% c("rts", "h0") && a %in% names(.RTS_ALIAS)) a <- .RTS_ALIAS[[a]]
   hit <- match(a, tolower(choices))
   if (is.na(hit)) {
     stop("`", what, "` must be one of ", paste0("\"", choices, "\"", collapse = ", "),

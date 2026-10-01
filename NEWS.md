@@ -1,5 +1,70 @@
 # DEA 1.0.3
 
+## A test of returns to scale, and a reason not to run it input-oriented
+
+`dea_rts_test()`, the nonparametric test of Simar and Wilson (2002).
+`dea_rts()` classifies each DMU and attaches no standard error to anything: a
+DMU whose constant- and variable-returns scores differ by 0.001 is classified
+exactly as confidently as one whose scores differ by 0.4, and nothing in that
+table says whether the *technology* may be taken to be a cone. This tests that,
+against a variable-returns alternative, under `h0 = "crs"`, `"nirs"` or
+`"ndrs"`.
+
+**Both aggregations, and the direction fixed once.** Scores enter on the
+package's common (0, 1] scale, so the statistic lies in (0, 1] and the test
+rejects for **small** values in both orientations, and `mean_of_ratios` is
+exactly the mean of `dea_rts()`'s `scale_eff` column. The per-DMU tests come
+free from the same replications and are reported at the Sidak level
+1 - (1 - alpha)^(1/n) rather than at `alpha`, since there are n of them.
+
+**The statistic agrees exactly with both packages that have this test, and the
+p-value convention does not.** Input-oriented, `ratio_of_means` and
+`mean_of_ratios` match `rDEA::rts.test`'s `w_hat` and `w48_hat + 1` and
+`npsf::nptestrts`'s `sefficiencyMean` and `mean(sefficiency)` to 1e-13, and the
+non-increasing versions match `nrsOVERvrsMean` and `mean(nrsOVERvrs)` to the
+same tolerance. Output-oriented, npsf aggregates on the `phi` scale where this
+package and rDEA aggregate on `1/phi`; on the recorded design that is 1.221348
+against 0.858356, and the reciprocal of the first is 0.818767, not the second,
+because a mean does not commute with a reciprocal. Both are legitimate
+statistics; the scale is now stated rather than inferred. The p-value here is
+(count + 1)/(B + 1) rather than count/B, so it is never exactly zero --- which
+`npsf::nptestrts` does print, from 100 draws.
+
+**The finding worth the item: on a bounded input support the input-oriented
+version of this test is not valid, and no bootstrap repairs it.** The
+variable-returns program cannot put `sum(lambda_i x_ij)` below `min_i x_ij`,
+because a convex combination of the sample's *j*th input is at least its
+smallest value. So a DMU whose restricted projection needs
+`theta * x_oj < min_i x_ij` in any input *j* has `theta_vrs > theta_crs` for a
+reason that has nothing to do with returns to scale, and no sample size removes
+it. Measured on `dea_sim(returns = 1)`, where the technology **is** a cone and
+the null is exactly true, so a consistent statistic must approach 1:
+
+| n | 80 | 200 | 800 | 3200 |
+|---|---|---|---|---|
+| input, ratio of means | 0.887 | 0.903 | 0.894 | 0.898 |
+| output, ratio of means | 0.970 | 0.985 | 0.991 | 0.997 |
+
+The input-oriented statistic does not converge, so that test rejects a true null
+with probability tending to one. Splitting the same designs on exactly the
+condition above separates a consistent statistic from a constant: at p = 1 the
+reachable DMUs give 0.982, 0.991, 0.9991, 0.9995 and the 34% that are not
+reachable give 0.755, 0.751, 0.771, 0.776. This is the same identification
+problem `dea_sim()`'s `x_range` argument exists for, reaching a test instead of
+a convergence rate.
+
+So `reachable` is reported per DMU, printed, and warned about past a quarter of
+the sample. The benign case is not "none flagged" but "a share that *shrinks*
+with n": output-oriented on the same cone that share runs 0.188, 0.020, 0.050
+where input-oriented it holds at 0.362, 0.340, 0.338. Neither
+`npsf::nptestrts` nor `rDEA::rts.test` reports anything of the kind, and both
+will run the input-oriented test on such a design without comment.
+
+Not implemented: Simar and Wilson (2011) show the full-sample bootstrap used
+here is not consistent for tests of this kind and propose an *m* out of *n*
+subsampling alternative. `?dea_rts_test` says so; this function is the 2002
+procedure, which is what both CRAN packages provide.
+
 ## Two-stage efficiency regression, done the way Simar and Wilson say to
 
 `dea_reg()`, implementing Algorithms #1 and #2 of Simar and Wilson (2007).
