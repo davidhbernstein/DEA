@@ -130,7 +130,7 @@
 ## DMU -- that reuse is where this package's speed comes from, so the first
 ## attempt must use it and only a failure may rebuild.
 .lp_radial_solve <- function(B, XRs, YRs, rts, orientation, Xs, Ys, o, exclude,
-                             fixed = NULL) {
+                             fixed = NULL, final = c(0L, 1L, 2L)) {
   ## The first attempt is the hot path -- it runs n times per fit and succeeds
   ## essentially always -- so it is written without the helper closures below
   ## rather than constructing them once per DMU for nothing. That is tidiness,
@@ -140,8 +140,8 @@
   ## package first -- whichever of the two ran second measured slower, in both
   ## orders.
   r <- .lp_radial_at(B, Xs, Ys, o, exclude = exclude, fixed = fixed)
-  if (r$status %in% c(0L, 1L, 2L)) return(r)
-  ok <- function(r) r$status %in% c(0L, 1L, 2L)
+  if (r$status %in% final) return(r)
+  ok <- function(r) r$status %in% final
   fresh <- function(mode = NULL) {
     B2 <- .lp_radial_build(XRs, YRs, rts, orientation)
     if (!is.null(mode)) invisible(lpSolveAPI::lp.control(B2$lp, scaling = mode))

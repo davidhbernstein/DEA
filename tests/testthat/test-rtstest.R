@@ -169,3 +169,107 @@ test_that("scaling the columns leaves the test alone", {
                                       seed = 3, progress = FALSE))
   expect_equal(a$statistic, c3$statistic, tolerance = 1e-9)
 })
+
+## ---------------------------------------------------------------------------
+## method = "subsample": the m out of n test of Simar and Wilson (2011).
+## ---------------------------------------------------------------------------
+
+test_that("subsampling leaves the observed statistic alone and is a valid test", {
+  d <- toy(40, 2, 1, 21, returns = 0.8)
+  a <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 39,
+                                     seed = 2, progress = FALSE))
+  b <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 39,
+                                     method = "subsample", m = 15, seed = 2,
+                                     progress = FALSE))
+  ## Only the null distribution changes; the statistic and the table's scores
+  ## are the same functional of the same data.
+  expect_equal(a$statistic, b$statistic)
+  expect_equal(a$table$scale_eff, b$table$scale_eff)
+  expect_identical(b$method, "subsample")
+  expect_identical(b$m, 15L)
+
+  ## kappa is the VRS rate whatever h0 is: the statistic is a contrast, and a
+  ## contrast converges no faster than its slower term.
+  expect_equal(b$kappa, 2 / (2 + 1 + 1))
+  ## tau is n^kappa (1 - S), with no recentring.
+  expect_equal(b$tau, 40^b$kappa * (1 - b$statistic))
+  expect_equal(b$boot_tau, 15^b$kappa * (1 - b$boot))
+
+  ## UPPER tail of tau -- large tau is small S -- with the observed value
+  ## counted as a draw.
+  expect_equal(b$p_value[["mean_of_ratios"]],
+               (sum(b$boot_tau[, 2] >= b$tau[["mean_of_ratios"]]) + 1) / (b$B + 1))
+  expect_true(all(b$p_value >= 1 / (b$B + 1) - 1e-12 & b$p_value <= 1))
+  expect_equal(unname(b$reject), unname(b$p_value < b$alpha))
+
+  ## No per-DMU tests, and they say so rather than inventing a number.
+  expect_true(all(is.na(b$table$p_value)))
+  expect_true(all(is.na(b$table$scale_efficient)))
+  expect_output(print(b), "m out of n subsampling")
+  expect_output(print(b), "not available under subsampling")
+  expect_output(print(a), "smoothed bootstrap")
+})
+
+test_that("subsample statistics are the statistic of the subsample itself", {
+  ## A draw must be the same functional of a smaller sample -- the subsample is
+  ## both the evaluated and the reference set. Rebuild one draw by hand.
+  d <- toy(30, 2, 1, 22, returns = 0.7)
+  b <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 3,
+                                     method = "subsample", m = 12, seed = 5,
+                                     progress = FALSE))
+  set.seed(5)
+  idx <- sample.int(30, 12, replace = FALSE)
+  g <- dea_rts(d$x[idx, , drop = FALSE], d$y[idx, , drop = FALSE],
+               orientation = "out")$table
+  expect_equal(unname(b$boot[1, "mean_of_ratios"]), mean(g$scale_eff),
+               tolerance = 1e-8)
+})
+
+test_that("the subsample size is chosen by minimum volatility of the critical value", {
+  d <- toy(60, 2, 1, 23, returns = 0.8)
+  b <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 39,
+                                     method = "subsample", B_select = 20,
+                                     seed = 3, progress = FALSE))
+  expect_true(b$m %in% b$m_grid)
+  expect_equal(rownames(b$critical_path), as.character(b$m_grid))
+  ## Only full-window candidates are eligible, so the chosen m is never one of
+  ## the `window` grid points at either end.
+  k <- length(b$m_grid); w <- 3L
+  expect_true(match(b$m, b$m_grid) > w && match(b$m, b$m_grid) <= k - w)
+  i <- (w + 1L):(k - w)
+  expect_equal(b$m, b$m_grid[i[which.min(b$volatility[i])]])
+  expect_output(print(b), "minimum volatility")
+
+  ## Reproducible, including the selection step.
+  b2 <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 39,
+                                      method = "subsample", B_select = 20,
+                                      seed = 3, progress = FALSE))
+  expect_equal(b$p_value, b2$p_value)
+  expect_identical(b$m, b2$m)
+})
+
+test_that("subsampling arguments are validated", {
+  d <- toy(30, 2, 1, 24, returns = 0.8)
+  f <- function(...) dea_rts_test(d$x, d$y, orientation = "out", B = 200,
+                                  progress = FALSE, ...)
+  expect_error(f(method = "jackknife"), "method")
+  expect_error(f(m = 10), "only to method")
+  expect_error(f(method = "subsample", m = 2), "3 <= m < n")
+  expect_error(f(method = "subsample", m = 30), "3 <= m < n")
+  expect_error(f(method = "subsample", m = NA_real_), "3 <= m < n")
+  expect_error(f(method = "subsample", m_grid = c(5, 8)), "at least 3")
+})
+
+test_that("subsampling rejects a far-from-cone technology and not a cone", {
+  ## The external check: dea_sim() makes H0 exactly true at returns = 1. One
+  ## dataset each way, so this is a smoke test of direction, not of size --
+  ## horserace/rts_subsample_experiment.R measures size and power.
+  cone <- dea_sim(100, p = 2, q = 1, returns = 1.0, seed = 3)
+  drs  <- dea_sim(100, p = 2, q = 1, returns = 0.5, seed = 3)
+  f <- function(d) suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out",
+                                                 method = "subsample", m = 25,
+                                                 B = 199, seed = 1,
+                                                 progress = FALSE))
+  expect_gt(f(cone)$p_value[["mean_of_ratios"]], 0.05)
+  expect_lt(f(drs)$p_value[["mean_of_ratios"]], 0.05)
+})

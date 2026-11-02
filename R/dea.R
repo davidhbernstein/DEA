@@ -157,12 +157,25 @@ dea <- function(x, y, data = NULL,
   eff <- numeric(n); st <- integer(n)
   L   <- if (peers) matrix(0, n, nr) else NULL
   suml <- numeric(n)
+  ## On a SELF-REFERENCED fit without super-efficiency, infeasibility is not an
+  ## answer the data can give: lambda = e_o with a score of 1 satisfies every
+  ## row. So there a status 2 is a solver failure and is retried like a 5.
+  ## Found 2026-11-02, not reasoned: a 200-DMU output-oriented vrs fit
+  ## (dea_sim(200, 2, 1, returns = 0.6, seed = 9958)) had DMU 130 reported
+  ## INFEASIBLE by the reused object, while a fresh object solved it at once.
+  ## Only here and not everywhere, because against an external reference set
+  ## infeasibility is real and common -- dea_subsample() loses over half the
+  ## draws of an efficient DMU to it -- and rebuilding for each would be slow.
+  final <- if (!super && identical(Xs, XRs) && identical(Ys, YRs)) {
+    c(0L, 1L)
+  } else c(0L, 1L, 2L)
 
   for (o in seq_len(n)) {
     ## Three stages, all in .lp_radial_solve(): the reused object, then a fresh
     ## one, then a fresh one with a different scaling mode. An infeasible
-    ## program (status 2) is not retried at all -- that is an answer about the
-    ## data, and under super-efficiency it is the expected one.
+    ## program (status 2) is not retried unless the fit is self-referenced
+    ## (see `final` above) -- otherwise that is an answer about the data, and
+    ## under super-efficiency it is the expected one.
     ##
     ## Stage one DOES fail where stage two does; this file used to say it had
     ## not been observed to, which was true only because nobody had looked with
@@ -173,7 +186,8 @@ dea <- function(x, y, data = NULL,
     ## rebuild alone cannot help -- a fresh object failed five times out of five
     ## on the same program. See .lp_solve_retry().
     r <- .lp_radial_solve(B, XRs, YRs, rts, orientation, Xs, Ys, o,
-                          exclude = if (super) o else NULL, fixed = fixed)
+                          exclude = if (super) o else NULL, fixed = fixed,
+                          final = final)
     eff[o] <- r$eff; st[o] <- r$status
     suml[o] <- if (all(is.na(r$lambda))) NA_real_ else sum(r$lambda)
     if (peers) L[o, ] <- r$lambda

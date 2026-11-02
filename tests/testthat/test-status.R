@@ -381,3 +381,23 @@ test_that("the rescale stage is what recovers it, not the rebuild", {
   expect_equal(r$status, 0L)
   expect_equal(r$eff, 1, tolerance = 1e-9)
 })
+
+test_that("a self-referenced radial fit never reports infeasible", {
+  ## lambda = e_o with a score of 1 is feasible for every self-referenced,
+  ## non-super program, so status 2 there is a SOLVER failure, not an answer.
+  ## Found 2026-11-02 by horserace/rts_subsample_experiment.R: on this design
+  ## the reused object called DMU 130 infeasible, and dea_rts_test() stopped.
+  ## A fresh object solves it; the dual agrees on 1.
+  sm <- dea_sim(200, p = 2, q = 1, returns = 0.6, seed = 9958)
+  f <- expect_silent(dea(sm$x, sm$y, rts = "vrs", orientation = "out"))
+  expect_true(all(is.finite(f$eff)))
+  expect_true(all(f$status == 0L))
+  expect_equal(f$eff[[130]], 1, tolerance = 1e-9)
+  m <- dea(sm$x, sm$y, rts = "vrs", orientation = "out", multipliers = TRUE)
+  expect_equal(m$eff[130], f$eff[130], tolerance = 1e-9)
+
+  ## And super-efficiency, where infeasibility IS the answer, is left alone:
+  ## still NA and still silent.
+  s <- dea(sm$x, sm$y, rts = "vrs", orientation = "out", super = TRUE)
+  expect_true(any(s$status == 2L))
+})

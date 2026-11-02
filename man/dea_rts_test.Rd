@@ -6,15 +6,19 @@
 \description{
 Test whether the technology as a whole may be taken to be constant-returns (or
 non-increasing-returns) against the variable-returns alternative, by the
-bootstrap of Simar and Wilson (2002). Where \code{\link{dea_rts}} classifies
+bootstrap of Simar and Wilson (2002) or the \eqn{m} out of \eqn{n}
+subsampling of Simar and Wilson (2011). Where \code{\link{dea_rts}} classifies
 each DMU with no standard error attached, this attaches a p-value to a statement
 about the sample.
 }
 \usage{
 dea_rts_test(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
-             orientation = c("in", "out"), B = 2000, alpha = 0.05,
-             bw = c("silverman", "nrd0", "ucv", "sj"), seed = NULL,
-             ncores = 1L, progress = interactive(), scaling = TRUE)
+             orientation = c("in", "out"),
+             method = c("bootstrap", "subsample"), B = 2000, alpha = 0.05,
+             bw = c("silverman", "nrd0", "ucv", "sj"),
+             m = NULL, m_grid = NULL, B_select = 200L, window = 3L,
+             seed = NULL, ncores = 1L, progress = interactive(),
+             scaling = TRUE)
 
 \method{print}{dea_rts_test}(x, \dots)
 \method{summary}{dea_rts_test}(object, \dots)
@@ -28,13 +32,23 @@ dea_rts_test(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
 \code{"drs"} and \code{"irs"} are accepted, as elsewhere in this package.}
 \item{orientation}{\code{"in"} or \code{"out"}, as in \code{\link{dea}}. Read
 \strong{What this test cannot be asked} below before choosing \code{"in"}.}
-\item{B}{Bootstrap replications. The p-value's resolution is
+\item{method}{How the null distribution is obtained: \code{"bootstrap"}, the
+smoothed bootstrap of Simar and Wilson (2002), or \code{"subsample"}, the
+\eqn{m} out of \eqn{n} subsampling of Simar and Wilson (2011). See
+\strong{Subsampling} below.}
+\item{B}{Bootstrap replications, or subsamples under
+\code{method = "subsample"}. The p-value's resolution is
 \eqn{1/(B+1)}, so a small \code{B} is not merely imprecise, it is a floor on
 how small a p-value can be reported; \code{B} below 200 warns.}
 \item{alpha}{Nominal level, used for \code{reject} and for the simultaneous
 level applied to the per-DMU tests.}
 \item{bw}{Bandwidth for the kernel that smooths the resampled efficiencies, as
-in \code{\link{dea_boot}}, or a single positive number.}
+in \code{\link{dea_boot}}, or a single positive number. Bootstrap only.}
+\item{m}{Subsample size, \eqn{3 \le m < n}. \code{NULL} chooses it by
+minimum volatility over \code{m_grid}. Subsampling only.}
+\item{m_grid, B_select, window}{The candidate sizes, the subsamples drawn at
+each, and the half-width of the volatility window, as in
+\code{\link{dea_subsample}}. Used only when \code{m} is \code{NULL}.}
 \item{seed}{Integer seed. Set and restored, so the caller's random stream is
 left as it was found.}
 \item{ncores}{Replications to run in parallel, as in \code{\link{dea_boot}}.}
@@ -56,6 +70,13 @@ p-value, whether the DMU is scale-efficient at the simultaneous level, and
 \item{boot}{The \code{B} by 2 matrix of statistics from the null distribution.}
 \item{boot_ratio}{The \code{n} by \code{B} matrix of per-DMU ratios.}
 \item{alpha_individual}{The Sidak level \eqn{1 - (1-\alpha)^{1/n}}.}
+\item{method}{Which null distribution was used.}
+\item{kappa, m, tau, boot_tau}{Subsampling only: the rate, the subsample size,
+the observed \eqn{n^\kappa(1-S_n)} and the \code{B} by 2 matrix of
+\eqn{m^\kappa(1-S^*_m)}.}
+\item{m_grid, critical_path, volatility}{Subsampling with \code{m} chosen:
+the candidates, the \eqn{1-\alpha} quantile of \code{boot_tau} at each, and
+the volatility the choice minimised.}
 }
 \details{
 Under the null the restricted technology is the true one, so the restricted and
@@ -128,11 +149,11 @@ returns.
 the test can be measured rather than assumed. Rejection rate at a nominal 5\%,
 output oriented, \code{B = 400}, 200 replications (100 at \eqn{n = 150}):
 \tabular{lrrrr}{
-                   	ab n=60, r=1 	ab n=150, r=1 	ab n=60, r=0.8 	ab n=60, r=0.6 \cr
-ratio of means     	ab 0.025 	ab 0.000 	ab 0.020 	ab 0.155 \cr
-mean of ratios     	ab 0.050 	ab 0.010 	ab 0.185 	ab 0.780 \cr
-\code{rDEA}        	ab 0.025 	ab 0.000 	ab 0.035 	ab 0.175 \cr
-\code{npsf}        	ab 0.315 	ab 0.240 	ab 0.680 	ab 0.990
+                   \tab n=60, r=1 \tab n=150, r=1 \tab n=60, r=0.8 \tab n=60, r=0.6 \cr
+ratio of means     \tab 0.025 \tab 0.000 \tab 0.020 \tab 0.155 \cr
+mean of ratios     \tab 0.050 \tab 0.010 \tab 0.185 \tab 0.780 \cr
+\code{rDEA}        \tab 0.025 \tab 0.000 \tab 0.035 \tab 0.175 \cr
+\code{npsf}        \tab 0.315 \tab 0.240 \tab 0.680 \tab 0.990
 }
 Three things to take from it.
 
@@ -152,6 +173,60 @@ reject as evidence for constant returns at these sample sizes.
 null 31.5\% of the time, because it draws a fresh pseudo-sample inside its DMU
 loop, so its apparently higher power is the same miscalibration seen from the
 other side.
+}
+\section{Subsampling}{
+Simar and Wilson (2011) show that the full-sample bootstrap is not consistent
+for tests of this kind, and propose \eqn{m} out of \eqn{n} subsampling instead.
+\code{method = "subsample"} implements it. Draw \eqn{m < n} DMUs without
+replacement, fit \emph{both} technologies to the subsample alone, and compute the
+statistic \eqn{S^*_m} from it. Then compare
+\deqn{\tau_n = n^\kappa (1 - S_n) \quad\mbox{with}\quad \tau^*_m = m^\kappa (1 - S^*_m),}
+rejecting for large \eqn{\tau_n}. Three things about that are choices:
+\itemize{
+\item \strong{No recentring.} \code{\link{dea_subsample}} centres on the
+full-sample estimate because it is approximating the distribution of an error
+around an unknown value. A test knows the null value: under H0 the statistic
+tends to 1. Under H1, \eqn{S_n} and \eqn{S^*_m} tend to the same \eqn{c < 1},
+so \eqn{\tau_n} outgrows \eqn{\tau^*_m}. That growth is the power, and centring
+on \eqn{S_n} would subtract it.
+\item \strong{\eqn{\kappa} is the variable-returns rate}, \eqn{2/(p+q+1)},
+whatever \code{h0} is. The statistic contrasts two estimators and converges no
+faster than the slower one; under \code{h0 = "crs"} that is not the
+restricted one.
+\item \strong{\eqn{m} is chosen by minimum volatility of the critical value}, the
+\eqn{1-\alpha} quantile of \eqn{\tau^*_m}, using the same rule and the same
+full-window restriction as \code{\link{dea_subsample}}. The path is returned in
+\code{critical_path}, so the choice can be inspected rather than trusted.
+}
+There are \strong{no per-DMU tests} under subsampling. A given DMU appears in only
+\eqn{m/n} of the subsamples, so its own statistic would rest on a fraction of
+\code{B}. Those columns come back \code{NA} rather than being computed from
+whichever draws happened to include the DMU.
+
+\strong{What it buys, measured.} Same design as above, both methods on the same
+datasets in every replication, 200 replications, \code{B = 400}:
+\tabular{lrrrrrr}{
+                   \tab n=60, r=1 \tab r=0.8 \tab r=0.6 \tab n=200, r=1 \tab r=0.8 \tab r=0.6 \cr
+bootstrap, ratio of means \tab 0.020 \tab 0.020 \tab 0.155 \tab 0.005 \tab 0.440 \tab 0.990 \cr
+bootstrap, mean of ratios \tab 0.035 \tab 0.195 \tab 0.755 \tab 0.035 \tab 0.985 \tab 1.000 \cr
+subsample, ratio of means \tab 0.025 \tab 0.265 \tab 0.745 \tab 0.000 \tab 0.885 \tab 1.000 \cr
+subsample, mean of ratios \tab 0.020 \tab 0.275 \tab 0.760 \tab 0.000 \tab 0.925 \tab 1.000
+}
+The \eqn{r = 1} columns are size; the rest are power. Subsampling
+\strong{repairs the ratio of means}: paired gains of 0.245, 0.590 and 0.445
+(\eqn{t} = 8.0, 16.6, 12.6). After the repair the two statistics behave alike,
+so the ratio of means' weakness under the bootstrap was in the null
+distribution, not in the statistic. \strong{For the mean of ratios it is not an
+improvement}: +0.080 at \eqn{n = 60, r = 0.8} (\eqn{t = 2.6}), nothing at
+\eqn{r = 0.6}, and \eqn{-0.060} at \eqn{n = 200, r = 0.8} (\eqn{t = -3.3}). It
+is also more conservative: no rejections at all under a true cone at
+\eqn{n = 200}, against 3.5\% for the bootstrap's mean of ratios.
+
+So \code{method = "bootstrap"} remains the default, and its mean of ratios
+remains the statistic to read. Use subsampling as a check that does not rest on
+the 2002 procedure's inconsistency, and expect it to be less willing to reject.
+The chosen \eqn{m} sits low in its grid (median 18--29 at \eqn{n = 200}), the
+same tendency \code{\link{dea_subsample}} shows.
 }
 \section{What this test cannot be asked}{
 \strong{On a bounded input support the input-oriented version of this test is not
@@ -186,10 +261,8 @@ Neither \code{npsf::nptestrts} nor \code{rDEA::rts.test} reports anything of the
 kind, and both will run the input-oriented test on such a design without
 comment.
 
-Separately, Simar and Wilson (2011) show that the full-sample bootstrap used
-here is not consistent for tests of this kind and propose an \eqn{m} out of
-\eqn{n} subsampling alternative. That is not implemented; this function is the
-2002 procedure, which is what both packages on CRAN provide.
+The subsampling version shares this limitation: it changes the null
+distribution, not the statistic, and the statistic is what fails to converge.
 }
 \references{
 Simar, L. and Wilson, P. W. (1998). Sensitivity analysis of efficiency scores:
@@ -204,7 +277,8 @@ bootstrap in nonparametric frontier models.
 \emph{Journal of Productivity Analysis} 36, 33--53.
 }
 \seealso{\code{\link{dea_rts}} for the per-DMU classification and scale
-efficiency, \code{\link{dea_boot}} for the resampling scheme this builds on.}
+efficiency, \code{\link{dea_boot}} for the resampling scheme this builds on,
+\code{\link{dea_subsample}} for the subsampling machinery.}
 \examples{
 sim <- dea_sim(80, p = 2, q = 1, returns = 0.6, seed = 2)
 ## Output oriented: see 'What this test cannot be asked' above.
@@ -213,4 +287,9 @@ r <- dea_rts_test(sim$x, sim$y, orientation = "out", B = 299, seed = 1,
 r
 ## The two aggregations are different tests, and on this design they disagree.
 head(r$table)
+\donttest{
+## The m out of n version: the same statistic, a different null distribution.
+dea_rts_test(sim$x, sim$y, orientation = "out", method = "subsample",
+             B = 299, seed = 1, progress = FALSE)
+}
 }

@@ -124,6 +124,57 @@
 ## `rDEA::rts.test` reports anything of the kind, and both will happily run the
 ## input-oriented test on such a design.
 ##
+## TWO WAYS TO GET THE NULL DISTRIBUTION, AND THE SECOND IS THERE BECAUSE THE
+## FIRST IS NOT CONSISTENT.  `method = "bootstrap"` is the 2002 procedure
+## described above.  `method = "subsample"` is the m out of n scheme of Simar and
+## Wilson (2011), who show the full-sample bootstrap is not consistent for tests
+## of this kind -- and horserace/README.md measures what that costs: power of
+## 2.0% against returns = 0.8, BELOW the test's own size.
+##
+## A SUBSAMPLING TEST IS NOT A SUBSAMPLING INTERVAL WITH THE SIGNS CHANGED, and
+## the difference is the one thing to get right here.  dea_subsample() recentres
+## on the full-sample estimate, because it is approximating the distribution of
+## (theta_hat - theta) and theta is unknown.  A TEST already knows the null
+## value: under H0 the statistic tends to 1.  So the right quantity is
+##
+##   tau_n   = n^kappa (1 - S_n)        observed
+##   tau*_m  = m^kappa (1 - S_m)        on each subsample, scored against ITSELF
+##
+## with NO recentring on S_n, and the test rejects for LARGE tau.  Recentring
+## would subtract exactly the signal: under H1 both S_n and S_m converge to the
+## same c < 1, so tau_n = n^kappa(1-c) outgrows tau*_m = m^kappa(1-c) and the
+## p-value goes to zero, which is where the power comes from.  Centre the
+## subsample statistics on S_n instead and that difference vanishes along with
+## the power.
+##
+## kappa is the VARIABLE-returns rate, 2/(p+q+1), whatever h0 is, and that is a
+## choice with a reason.  1 - S_n is a contrast of the restricted and the
+## unrestricted estimator, and a contrast converges no faster than its slower
+## term.  Under h0 = "crs" the restricted estimator runs at 2/(p+q), faster, so
+## taking dea_rate(p, q, h0) -- the obvious call, and the first draft's -- would
+## scale by the WRONG term and inflate tau by n^(2/(p+q) - 2/(p+q+1)).  For
+## nirs and ndrs the two rates coincide and the question does not arise.
+##
+## m is chosen by the
+## same minimum-volatility rule dea_subsample() uses, applied to the CRITICAL
+## VALUE rather than to an interval endpoint -- the quantity the test actually
+## depends on.
+##
+## WHAT SUBSAMPLING CANNOT DO HERE.  The per-DMU tests have no subsampling
+## analogue worth reporting: a subsample contains m of the n DMUs, so a given
+## DMU appears in only m/n of the draws and its own statistic would rest on a
+## fraction of B.  Those columns come back NA under `method = "subsample"`,
+## rather than being quietly computed from whatever draws happened to include
+## the DMU.
+##
+## MEASURED, IT REPAIRS ONE STATISTIC AND NOT THE OTHER, which is why it is not
+## the default.  horserace/rts_subsample_experiment.R, both methods on the same
+## datasets, 200 replications: the ratio of means gains 0.245, 0.590 and 0.445
+## in power (t = 8.0, 16.6, 12.6) and ends level with the mean of ratios. The mean
+## of ratios gains 0.080 at n = 60, r = 0.8, nothing at r = 0.6, and LOSES 0.060
+## at n = 200, r = 0.8 (t = -3.3), with size falling to 0.000 at n = 200. The
+## bootstrap's mean of ratios remains the statistic to read.
+##
 ## THE P-VALUE IS (count + 1)/(B + 1), not count/B.  The observed statistic is
 ## itself a draw under H0, so including it is the standard Monte Carlo
 ## correction, and it means the reported p-value is never exactly zero -- which
@@ -138,8 +189,11 @@
 ## ---------------------------------------------------------------------------
 
 dea_rts_test <- function(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
-                         orientation = c("in", "out"), B = 2000, alpha = 0.05,
+                         orientation = c("in", "out"),
+                         method = c("bootstrap", "subsample"),
+                         B = 2000, alpha = 0.05,
                          bw = c("silverman", "nrd0", "ucv", "sj"),
+                         m = NULL, m_grid = NULL, B_select = 200L, window = 3L,
                          seed = NULL, ncores = 1L, progress = interactive(),
                          scaling = TRUE) {
 
@@ -147,11 +201,16 @@ dea_rts_test <- function(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
   .dea_check_data_arg(data)
   h0 <- .match_arg_ci(h0, c("crs", "nirs", "ndrs"), "h0")
   orientation <- .match_arg_ci(orientation, c("in", "out"), "orientation")
+  method <- .match_arg_ci(method, c("bootstrap", "subsample"), "method")
   if (!is.numeric(B) || length(B) != 1L || B < 2) {
     stop("`B` must be a single number of bootstrap replications, at least 2.",
          call. = FALSE)
   }
   B <- as.integer(B)
+  if (!is.null(m) && !identical(method, "subsample")) {
+    stop("`m` is the subsample size and applies only to method = ",
+         "\"subsample\".", call. = FALSE)
+  }
   if (!is.numeric(alpha) || length(alpha) != 1L || alpha <= 0 || alpha >= 1) {
     stop("`alpha` must be in (0, 1).", call. = FALSE)
   }
@@ -169,6 +228,10 @@ dea_rts_test <- function(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
   .dea_check(X, Y)
   dmu <- .dea_dmu_names(X, Y)
   n <- nrow(X); p <- ncol(X); q <- ncol(Y)
+  if (!is.null(m) && (!is.numeric(m) || length(m) != 1L || !is.finite(m) ||
+                      m < 3 || m >= n)) {
+    stop("`m` must be a single number with 3 <= m < n = ", n, ".", call. = FALSE)
+  }
   sc <- .dea_scale(X, Y, scaling)
   Xs <- sc$X; Ys <- sc$Y
 
@@ -212,53 +275,125 @@ dea_rts_test <- function(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
             call. = FALSE)
   }
 
-  ## Reflect the RESTRICTED scores about 1: they are the consistent estimator
-  ## under H0, and the pseudo-sample has to come from an H0 world.
-  refl <- c(e0, 2 - e0)
-  h <- .dea_bandwidth(bw, refl, n)
-  shrink <- sqrt(1 + h^2 / stats::sd(refl)^2)
-
   if (!is.null(seed)) {
     old <- .rng_snapshot(); on.exit(.rng_restore(old), add = TRUE)
     set.seed(seed)
   }
 
-  one_rep <- function(b) {
-    beta <- sample(refl, n, replace = TRUE)
-    tw   <- mean(beta) + (beta + h * stats::rnorm(n) - mean(beta)) / shrink
-    st <- if (orientation == "in") ifelse(tw > 1, 2 - tw, tw) else ifelse(tw < 1, 2 - tw, tw)
-    st <- if (orientation == "in") pmin(pmax(st, .DEA_CONSTANTS$MIN_POS), 1) else pmax(st, 1)
-    if (orientation == "in") {
-      Xb <- Xs * (e0 / st); Yb <- Ys
-    } else {
-      Xb <- Xs; Yb <- Ys * (e0 / st)
+  h <- NA_real_; kappa <- NA_real_; m_used <- NA_integer_
+  grid <- NULL; vol <- NULL; crit_path <- NULL; boot_tau <- NULL; tau_obs <- NULL
+
+  if (identical(method, "bootstrap")) {
+    ## Reflect the RESTRICTED scores about 1: they are the consistent estimator
+    ## under H0, and the pseudo-sample has to come from an H0 world.
+    refl <- c(e0, 2 - e0)
+    h <- .dea_bandwidth(bw, refl, n)
+    shrink <- sqrt(1 + h^2 / stats::sd(refl)^2)
+
+    one_rep <- function(b) {
+      beta <- sample(refl, n, replace = TRUE)
+      tw   <- mean(beta) + (beta + h * stats::rnorm(n) - mean(beta)) / shrink
+      st <- if (orientation == "in") ifelse(tw > 1, 2 - tw, tw) else ifelse(tw < 1, 2 - tw, tw)
+      st <- if (orientation == "in") pmin(pmax(st, .DEA_CONSTANTS$MIN_POS), 1) else pmax(st, 1)
+      if (orientation == "in") {
+        Xb <- Xs * (e0 / st); Yb <- Ys
+      } else {
+        Xb <- Xs; Yb <- Ys * (e0 / st)
+      }
+      a <- fit(Xb, Yb, h0)
+      v <- fit(Xb, Yb, "vrs")
+      c(.rtst_stat(a, v, orientation), .rtst_ratio(a, v, orientation))
     }
-    a <- fit(Xb, Yb, h0)
-    v <- fit(Xb, Yb, "vrs")
-    c(.rtst_stat(a, v, orientation), .rtst_ratio(a, v, orientation))
+
+    reps <- .dea_replicate(one_rep, B, ncores, progress)
+    M <- do.call(cbind, reps)                     ## (2 + n) x B
+    boot_stat  <- t(M[1:2, , drop = FALSE])       ## B x 2
+    colnames(boot_stat) <- c("ratio_of_means", "mean_of_ratios")
+    boot_ratio <- M[-(1:2), , drop = FALSE]       ## n x B
+    rownames(boot_ratio) <- dmu
+
+    ## One-sided, lower tail, with the observed value counted as a draw.
+    pv_lo <- function(bv, obs) (sum(bv <= obs, na.rm = TRUE) + 1) / (sum(is.finite(bv)) + 1)
+    p_global <- c(ratio_of_means = pv_lo(boot_stat[, 1], stat[["ratio_of_means"]]),
+                  mean_of_ratios = pv_lo(boot_stat[, 2], stat[["mean_of_ratios"]]))
+    p_dmu <- vapply(seq_len(n), function(i) pv_lo(boot_ratio[i, ], ratio_obs[i]),
+                    numeric(1))
+  } else {
+    kappa <- -dea_rate(p, q, "vrs", what = "estimator")
+    tau_obs <- n^kappa * (1 - stat)
+    names(tau_obs) <- names(stat)
+
+    ## One subsample: m DMUs, scored against THEMSELVES. The statistic has to be
+    ## the same functional of a smaller sample, which means the subsample is both
+    ## the evaluated and the reference set -- not the original points against a
+    ## smaller technology, which is what the interval version does.
+    sub_rep <- function(mm) function(b) {
+      idx <- sample.int(n, mm, replace = FALSE)
+      Xa <- Xs[idx, , drop = FALSE]; Ya <- Ys[idx, , drop = FALSE]
+      f2 <- function(rts) {
+        e <- .dea_radial(Xa, Ya, Xa, Ya, rts, orientation, super = FALSE,
+                         slack = FALSE, peers = FALSE, mm, mm, p, q)$eff
+        e[is.finite(e) & abs(e - 1) < .DEA_CONSTANTS$TOL_EFF] <- 1
+        e
+      }
+      .rtst_stat(f2(h0), f2("vrs"), orientation)
+    }
+    sub_draw <- function(mm, reps) {
+      S <- t(do.call(cbind, .dea_replicate(sub_rep(mm), reps, ncores, FALSE)))
+      colnames(S) <- c("ratio_of_means", "mean_of_ratios")
+      list(S = S, tau = mm^kappa * (1 - S))
+    }
+
+    if (is.null(m)) {
+      grid <- .sub_grid(m_grid, n)
+      if (progress) cat("  selecting m over", length(grid), "candidates\n")
+      ## The volatility rule applied to the CRITICAL VALUE -- the quantity the
+      ## test's verdict actually depends on -- rather than to an interval end.
+      crit_path <- matrix(NA_real_, length(grid), 2L,
+                          dimnames = list(as.character(grid),
+                                          c("ratio_of_means", "mean_of_ratios")))
+      for (i in seq_along(grid)) {
+        d2 <- sub_draw(grid[i], as.integer(B_select))
+        crit_path[i, ] <- apply(d2$tau, 2L, stats::quantile, probs = 1 - alpha,
+                                na.rm = TRUE, names = FALSE)
+      }
+      vol <- .sub_volatility(crit_path, window)
+      el <- .sub_eligible(length(grid), window)
+      if (el$window < as.integer(window)) {
+        warning("The grid of ", length(grid), " candidates is too short for a ",
+                "window of ", window, "; the volatility rule used a window of ",
+                el$window, " instead.", call. = FALSE)
+      }
+      elig <- el$idx[is.finite(vol[el$idx])]
+      if (!length(elig)) {
+        stop("No candidate m produced a usable critical value. Raise ",
+             "`B_select`, give a coarser `m_grid`, or pass `m` directly.",
+             call. = FALSE)
+      }
+      m_used <- grid[elig[which.min(vol[elig])]]
+    } else {
+      m_used <- as.integer(m)
+    }
+
+    fin <- sub_draw(m_used, B)
+    boot_stat <- fin$S
+    boot_tau <- fin$tau
+    ## Upper tail: the test rejects for LARGE tau, which is small S.
+    pv_hi <- function(tv, obs) (sum(tv >= obs, na.rm = TRUE) + 1) / (sum(is.finite(tv)) + 1)
+    p_global <- c(ratio_of_means = pv_hi(boot_tau[, 1], tau_obs[["ratio_of_means"]]),
+                  mean_of_ratios = pv_hi(boot_tau[, 2], tau_obs[["mean_of_ratios"]]))
+    ## No per-DMU analogue: a DMU appears in only m/n of the subsamples.
+    boot_ratio <- matrix(NA_real_, n, B, dimnames = list(dmu, NULL))
+    p_dmu <- rep(NA_real_, n)
   }
-
-  reps <- .dea_replicate(one_rep, B, ncores, progress)
-  M <- do.call(cbind, reps)                     ## (2 + n) x B
-  boot_stat  <- t(M[1:2, , drop = FALSE])       ## B x 2
-  colnames(boot_stat) <- c("ratio_of_means", "mean_of_ratios")
-  boot_ratio <- M[-(1:2), , drop = FALSE]       ## n x B
-  rownames(boot_ratio) <- dmu
-
-  ## One-sided, lower tail, with the observed value counted as a draw.
-  pv <- function(bv, obs) (sum(bv <= obs, na.rm = TRUE) + 1) / (sum(is.finite(bv)) + 1)
-  p_global <- c(ratio_of_means = pv(boot_stat[, 1], stat[["ratio_of_means"]]),
-                mean_of_ratios = pv(boot_stat[, 2], stat[["mean_of_ratios"]]))
-
-  p_dmu <- vapply(seq_len(n), function(i) pv(boot_ratio[i, ], ratio_obs[i]),
-                  numeric(1))
   alpha_ind <- 1 - (1 - alpha)^(1 / n)
 
   tab <- data.frame(dmu = dmu,
                     h0 = as.numeric(e0), vrs = as.numeric(ev),
                     scale_eff = as.numeric(ratio_obs),
                     p_value = p_dmu,
-                    scale_efficient = p_dmu > alpha_ind,
+                    scale_efficient = if (identical(method, "subsample")) NA
+                                      else p_dmu > alpha_ind,
                     reachable = reach,
                     row.names = NULL, stringsAsFactors = FALSE)
   names(tab)[2] <- h0
@@ -267,8 +402,12 @@ dea_rts_test <- function(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
     statistic = stat, p_value = p_global, reject = p_global < alpha,
     table = tab, boot = boot_stat, boot_ratio = boot_ratio,
     h0 = h0, alternative = "vrs", orientation = orientation,
+    method = method, kappa = kappa, m = m_used, m_grid = grid,
+    critical_path = crit_path, volatility = vol,
+    boot_tau = boot_tau, tau = tau_obs,
     B = B, alpha = alpha, alpha_individual = alpha_ind,
-    bw = h, bw_rule = if (is.numeric(bw)) "user" else bw[1],
+    bw = h, bw_rule = if (identical(method, "subsample")) NA_character_
+                      else if (is.numeric(bw)) "user" else bw[1],
     eff_h0 = e0, eff_vrs = ev, reachable = reach,
     n = n, p = p, q = q, dmu = dmu,
     total_time = proc.time()[["elapsed"]] - t0, call = call
@@ -305,12 +444,22 @@ dea_rts_test <- function(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
 }
 
 print.dea_rts_test <- function(x, ...) {
+  sub <- identical(x$method, "subsample")
   cat("--- Simar-Wilson test of returns to scale ---\n")
   cat("H0: the technology is ", toupper(x$h0), "    H1: ", toupper(x$alternative),
       "    (", if (x$orientation == "in") "input" else "output",
       " orientation)\n", sep = "")
-  cat("B = ", x$B, "   bandwidth = ", format(x$bw, digits = 4), " (", x$bw_rule,
-      ")   n = ", x$n, "   ", format(round(x$total_time, 2)), " sec\n", sep = "")
+  if (sub) {
+    cat("null distribution: m out of n subsampling   m = ", x$m,
+        if (is.null(x$m_grid)) " (supplied)" else " (minimum volatility)",
+        "   kappa = ", format(x$kappa, digits = 4), "\n", sep = "")
+    cat("B = ", x$B, "   n = ", x$n, "   ", format(round(x$total_time, 2)),
+        " sec\n", sep = "")
+  } else {
+    cat("null distribution: smoothed bootstrap (2002)\n")
+    cat("B = ", x$B, "   bandwidth = ", format(x$bw, digits = 4), " (", x$bw_rule,
+        ")   n = ", x$n, "   ", format(round(x$total_time, 2)), " sec\n", sep = "")
+  }
   cat("\nstatistic lies in (0, 1]; the test rejects for SMALL values\n")
   st <- data.frame(statistic = round(as.numeric(x$statistic), 6),
                    p_value = round(as.numeric(x$p_value), 6),
@@ -319,9 +468,13 @@ print.dea_rts_test <- function(x, ...) {
   print(st)
   cat("\nreject at alpha = ", x$alpha, ";  p-value resolution 1/(B+1) = ",
       format(1 / (x$B + 1), digits = 3), "\n", sep = "")
-  ns <- sum(!x$table$scale_efficient)
-  cat("\nindividually scale-INEFFICIENT (simultaneous level ",
-      format(x$alpha_individual, digits = 3), "): ", ns, " of ", x$n, "\n", sep = "")
+  if (sub) {
+    cat("\nper-DMU tests: not available under subsampling (see ?dea_rts_test)\n")
+  } else {
+    ns <- sum(!x$table$scale_efficient)
+    cat("\nindividually scale-INEFFICIENT (simultaneous level ",
+        format(x$alpha_individual, digits = 3), "): ", ns, " of ", x$n, "\n", sep = "")
+  }
   cat("H0 projection unreachable inside the sample's support: ",
       sum(!x$reachable), " of ", x$n, " (see ?dea_rts_test)\n", sep = "")
   invisible(x)

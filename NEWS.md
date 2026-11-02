@@ -1,5 +1,51 @@
 # DEA 1.0.3
 
+## `dea_rts_test(method = "subsample")`: the m out of n test
+
+Simar and Wilson (2011) show that the 2002 full-sample bootstrap behind
+`dea_rts_test()` is not consistent for tests of this kind. `method = "subsample"`
+is their alternative. Each subsample of *m* DMUs is scored against itself, and
+`n^kappa (1 - S_n)` is compared with `m^kappa (1 - S*_m)` **without recentring**.
+A test knows its null value, and recentring on `S_n` would subtract exactly the
+growth that gives it power. `kappa` is the variable-returns rate whatever `h0`
+is, because a contrast of two estimators converges no faster than the slower
+one. *m* is chosen by minimum volatility of the critical value. There are no
+per-DMU tests under subsampling, and those columns are `NA`.
+
+**Measured, it repairs the ratio of means and not the mean of ratios.** Output
+oriented, H0: CRS, 200 replications, both methods on the same datasets:
+
+| | n=60 r=1 | r=0.8 | r=0.6 | n=200 r=1 | r=0.8 | r=0.6 |
+|---|---|---|---|---|---|---|
+| bootstrap, ratio of means | 0.020 | 0.020 | 0.155 | 0.005 | 0.440 | 0.990 |
+| bootstrap, mean of ratios | 0.035 | 0.195 | 0.755 | 0.035 | 0.985 | 1.000 |
+| subsample, ratio of means | 0.025 | 0.265 | 0.745 | 0.000 | 0.885 | 1.000 |
+| subsample, mean of ratios | 0.020 | 0.275 | 0.760 | 0.000 | 0.925 | 1.000 |
+
+The ratio of means gains 0.245, 0.590 and 0.445 (*t* = 8.0, 16.6, 12.6), so its
+weakness under the bootstrap was in the null distribution, not in the statistic.
+The mean of ratios gains 0.080 at n = 60, r = 0.8, nothing at r = 0.6, and loses
+0.060 at n = 200, r = 0.8 (*t* = −3.3). Subsampling is also more conservative,
+with no rejections at all under a true cone at n = 200. So the bootstrap stays the
+default and its mean of ratios stays the statistic to read.
+
+## A false "infeasible" on a self-referenced radial fit is now retried
+
+The reused LP object can report status 2 for a program that is provably
+feasible. Found when `dea_rts_test()` stopped on
+`dea_sim(200, 2, 1, returns = 0.6, seed = 9958)`, where `dea(rts = "vrs",
+orientation = "out")` returned NA for DMU 130. A fresh object scores it 1, and
+the dual agrees. On a self-referenced, non-super fit `lambda = e_o` is always
+feasible, so status 2 there is now retried like a numerical failure. Elsewhere
+(an external `xref`, `super = TRUE`) infeasibility is real and is still taken as
+the answer.
+
+## `?dea_rts_test`'s size-and-power table rendered as garbage
+
+Its `\tab` separators had become literal TAB characters followed by `ab`, so
+the table read `ab 0.025 ab 0.000 ...`. Fixed; that was the only file affected.
+The bug was never on CRAN: it came in after 1.0.0.
+
 ## Subsampling intervals: the m out of n bootstrap
 
 `dea_subsample()` (Simar and Wilson 2011). `dea_boot()` resamples all *n*
