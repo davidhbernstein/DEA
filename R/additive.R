@@ -174,9 +174,9 @@ dea_add <- function(x, y, data = NULL,
     lpSolveAPI::set.rhs(lp, c(X[o, ], Y[o, ]), seq_len(p + q))
   }
 
+  fin <- .lp_final(X, Y, XR, YR)
   for (o in seq_len(n)) {
     aim(lp, o)
-    st[o] <- solve(lp)
     ## RETRY ON A FRESH LP, for the reason set out at length in .dea_radial():
     ## the object is reused across all n DMUs and carries basis and
     ## factorisation state, which for some right-hand sides is bad enough that
@@ -185,29 +185,20 @@ dea_add <- function(x, y, data = NULL,
     ## out of five. Without this it was reported NA -- a recoverable failure
     ## presented as an unrecoverable one.
     ##
-    ## Infeasible (2) is NOT retried: that is an answer about the data.
-    if (!st[o] %in% c(0L, 1L, 2L)) {
-      S2 <- .lp_slack_build(XR, YR, rts)
-      aim(S2$lp, o, fresh = TRUE)
-      st[o] <- solve(S2$lp)
-      if (st[o] %in% c(0L, 1L)) lp2 <- S2$lp else lp2 <- NULL
-      if (!is.null(lp2)) {
-        z <- lpSolveAPI::get.objective(lp2)
-        eff[o] <- if (identical(measure, "unweighted")) z else 1 - z
-        v <- lpSolveAPI::get.variables(lp2)
-        if (peers) L[o, ] <- v[seq_len(nr)]
-        sx[o, ] <- v[nr + seq_len(p)]
-        sy[o, ] <- v[nr + p + seq_len(q)]
-        next
-      }
-    }
+    ## This sweep used to carry its own two-stage copy of the retry, without the
+    ## scaling stage; it now uses the shared one. Infeasible (2) is final only
+    ## where it can be an answer -- see .lp_final().
+    r <- .lp_solve_retry(lp, function() {
+      l <- .lp_slack_build(XR, YR, rts)$lp; aim(l, o, fresh = TRUE); l },
+      final = fin)
+    st[o] <- r$status
     if (!st[o] %in% c(0L, 1L)) { eff[o] <- NA_real_; next }
-    z <- lpSolveAPI::get.objective(lp)
+    z <- lpSolveAPI::get.objective(r$lp)
     ## RAM and MIP are normalized so that the objective is an inefficiency
     ## share; the unweighted model has no such normalization and is reported
     ## as the raw total it is.
     eff[o] <- if (identical(measure, "unweighted")) z else 1 - z
-    v <- lpSolveAPI::get.variables(lp)
+    v <- lpSolveAPI::get.variables(r$lp)
     if (peers) L[o, ] <- v[seq_len(nr)]
     sx[o, ] <- v[nr + seq_len(p)]
     sy[o, ] <- v[nr + p + seq_len(q)]

@@ -401,3 +401,61 @@ test_that("a self-referenced radial fit never reports infeasible", {
   s <- dea(sm$x, sm$y, rts = "vrs", orientation = "out", super = TRUE)
   expect_true(any(s$status == 2L))
 })
+
+test_that("every sweep treats status 2 as final only where it can be an answer", {
+  ## The false infeasible above is too rare to reproduce in every model (rarer
+  ## than one fit in 3000 -- horserace/false_infeasible_sweep.R), so this checks
+  ## the WIRING: which statuses each sweep hands the retry as final, on a
+  ## self-referenced fit and against an external reference set.
+  expect_identical(.lp_final(1, 1, 1, 1), c(0L, 1L))
+  expect_identical(.lp_final(1, 1, 1, 1, super = TRUE), c(0L, 1L, 2L))
+  expect_identical(.lp_final(1, 1, 2, 1), c(0L, 1L, 2L))
+
+  seen <- list()
+  real_retry  <- .lp_solve_retry
+  real_radial <- .lp_radial_solve
+  local_mocked_bindings(
+    .lp_solve_retry = function(lp, fresh, final = c(0L, 1L, 2L)) {
+      seen[[length(seen) + 1L]] <<- final
+      real_retry(lp, fresh, final)
+    },
+    .lp_radial_solve = function(..., final = c(0L, 1L, 2L)) {
+      seen[[length(seen) + 1L]] <<- final
+      real_radial(..., final = final)
+    })
+  finals <- function(expr) {
+    seen <<- list(); force(expr)
+    unique(seen)
+  }
+
+  d  <- toy(15, 2, 1, 31)
+  xr <- d$x[1:10, , drop = FALSE]; yr <- d$y[1:10, , drop = FALSE]
+  fits <- list(
+    radial  = function(...) dea(d$x, d$y, orientation = "out", ...),
+    sbm     = function(...) dea_sbm(d$x, d$y, ...),
+    sbm_in  = function(...) dea_sbm(d$x, d$y, orientation = "in", ...),
+    ddf     = function(...) dea_ddf(d$x, d$y, ...),
+    add     = function(...) dea_add(d$x, d$y, ...),
+    cost    = function(...) dea_cost(d$x, d$y, w = c(1, 2), ...),
+    revenue = function(...) dea_revenue(d$x, d$y, r = 1, ...))
+  for (nm in names(fits)) {
+    expect_identical(finals(suppressWarnings(fits[[nm]]())), list(c(0L, 1L)),
+                     info = paste(nm, "self-referenced"))
+    expect_identical(finals(suppressWarnings(fits[[nm]](xref = xr, yref = yr))),
+                     list(c(0L, 1L, 2L)), info = paste(nm, "external xref"))
+  }
+  ## Super-efficiency removes the DMU from its own reference set, so there 2 is
+  ## the expected answer and must stay final.
+  expect_identical(finals(suppressWarnings(dea(d$x, d$y, super = TRUE))),
+                   list(c(0L, 1L, 2L)))
+  ## Profit has only the returns-to-scale row, so it is feasible for ANY
+  ## reference set. Its technical half is a dea_ddf() against the same external
+  ## set, which rightly keeps 2 final -- so both appear, profit's first.
+  expect_identical(finals(suppressWarnings(
+    dea_profit(d$x, d$y, w = c(1, 2), r = 1, xref = xr, yref = yr))),
+    list(c(0L, 1L), c(0L, 1L, 2L)))
+  ## Weak disposability is always self-referenced.
+  bad <- d$y * 0.5 + 0.1
+  expect_identical(finals(suppressWarnings(dea_weak(d$x, d$y, bad = bad))),
+                   list(c(0L, 1L)))
+})

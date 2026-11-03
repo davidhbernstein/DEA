@@ -133,7 +133,11 @@ dea_profit <- function(x, y, w, r, data = NULL,
   L <- if (peers) matrix(0, n, nr) else NULL
   for (o in seq_len(n)) {
     aim(lp, o)
-    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l })
+    ## Never infeasible, for ANY reference set: the only row is the
+    ## returns-to-scale one, which some lambda always satisfies. So a status 2
+    ## here is always a solver failure.
+    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l },
+                         final = c(0L, 1L))
     st[o] <- z$status
     if (!st[o] %in% c(0L, 1L)) { profit_max[o] <- NA_real_; next }
     profit_max[o] <- lpSolveAPI::get.objective(z$lp)
@@ -246,9 +250,11 @@ dea_profit <- function(x, y, w, r, data = NULL,
   opt <- numeric(n); st <- integer(n)
   L   <- if (peers) matrix(0, n, nr) else NULL
   OPTQ <- matrix(NA_real_, n, if (cost) p else q)
+  fin <- .lp_final(X, Y, XR, YR)
   for (o in seq_len(n)) {
     aim(lp, o)
-    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l })
+    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l },
+                         final = fin)
     st[o] <- z$status
     if (!st[o] %in% c(0L, 1L)) { opt[o] <- NA_real_; next }
     opt[o] <- lpSolveAPI::get.objective(z$lp)

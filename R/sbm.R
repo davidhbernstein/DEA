@@ -165,10 +165,12 @@ dea_sbm <- function(x, y, data = NULL,
   eff <- numeric(n); st <- integer(n)
   sx <- matrix(NA_real_, n, p); sy <- matrix(NA_real_, n, q)
   L  <- if (peers) matrix(0, n, nr) else NULL
+  fin <- .lp_final(X, Y, XR, YR)
 
   for (o in seq_len(n)) {
     aim(lp, o)
-    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l })
+    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l },
+                         final = fin)
     st[o] <- z$status
     if (!st[o] %in% c(0L, 1L)) { eff[o] <- NA_real_; next }
     eff[o] <- lpSolveAPI::get.objective(z$lp)
@@ -201,6 +203,7 @@ dea_sbm <- function(x, y, data = NULL,
   eff <- numeric(n); st <- integer(n)
   sx <- matrix(NA_real_, n, p); sy <- matrix(NA_real_, n, q)
   L  <- if (peers) matrix(0, n, nr) else NULL
+  fin <- .lp_final(X, Y, XR, YR)
 
   ## Point a program at DMU o. Separate from the loop so that a REBUILT program
   ## is aimed identically -- see .lp_solve_retry(). This is the sweep the
@@ -223,7 +226,7 @@ dea_sbm <- function(x, y, data = NULL,
   for (o in seq_len(n)) {
     aim(lp, o)
     r <- .lp_solve_retry(lp, function() {
-      l <- .lp_slack_build(XR, YR, rts)$lp; aim(l, o); l })
+      l <- .lp_slack_build(XR, YR, rts)$lp; aim(l, o); l }, final = fin)
     st[o] <- r$status
     if (!st[o] %in% c(0L, 1L)) { eff[o] <- NA_real_; next }
     z <- lpSolveAPI::get.objective(r$lp)

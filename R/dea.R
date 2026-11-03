@@ -157,25 +157,16 @@ dea <- function(x, y, data = NULL,
   eff <- numeric(n); st <- integer(n)
   L   <- if (peers) matrix(0, n, nr) else NULL
   suml <- numeric(n)
-  ## On a SELF-REFERENCED fit without super-efficiency, infeasibility is not an
-  ## answer the data can give: lambda = e_o with a score of 1 satisfies every
-  ## row. So there a status 2 is a solver failure and is retried like a 5.
-  ## Found 2026-11-02, not reasoned: a 200-DMU output-oriented vrs fit
-  ## (dea_sim(200, 2, 1, returns = 0.6, seed = 9958)) had DMU 130 reported
-  ## INFEASIBLE by the reused object, while a fresh object solved it at once.
-  ## Only here and not everywhere, because against an external reference set
-  ## infeasibility is real and common -- dea_subsample() loses over half the
-  ## draws of an efficient DMU to it -- and rebuilding for each would be slow.
-  final <- if (!super && identical(Xs, XRs) && identical(Ys, YRs)) {
-    c(0L, 1L)
-  } else c(0L, 1L, 2L)
+  ## Self-referenced and not super: status 2 is a solver failure, not an
+  ## answer. Where this was found is recorded at .lp_final().
+  final <- .lp_final(Xs, Ys, XRs, YRs, super)
 
   for (o in seq_len(n)) {
     ## Three stages, all in .lp_radial_solve(): the reused object, then a fresh
     ## one, then a fresh one with a different scaling mode. An infeasible
-    ## program (status 2) is not retried unless the fit is self-referenced
-    ## (see `final` above) -- otherwise that is an answer about the data, and
-    ## under super-efficiency it is the expected one.
+    ## program (status 2) is retried only where it cannot be an answer (see
+    ## .lp_final()) -- otherwise it is a statement about the data, and under
+    ## super-efficiency it is the expected one.
     ##
     ## Stage one DOES fail where stage two does; this file used to say it had
     ## not been observed to, which was true only because nobody had looked with

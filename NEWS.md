@@ -40,6 +40,16 @@ feasible, so status 2 there is now retried like a numerical failure. Elsewhere
 (an external `xref`, `super = TRUE`) infeasibility is real and is still taken as
 the answer.
 
+The same rule now covers **every** envelopment sweep: `dea_sbm()` in both forms,
+`dea_ddf()`, `dea_add()`, `dea_cost()`, `dea_revenue()` and `dea_weak()`.
+`dea_profit()`'s program is feasible for any reference set, so it never treats
+status 2 as final. This is applied on the proof, not on an observed failure in
+those models. The failure is too rare to measure: a sweep of 3,600 simulated
+designs across ten models found none, and found none in the radial model
+either with the fix switched off, though the known case still reproduces.
+`dea_ddf()` and `dea_add()` also had their own two-stage retry without the
+scaling stage; they now use the shared three-stage one.
+
 ## `?dea_rts_test`'s size-and-power table rendered as garbage
 
 Its `\tab` separators had become literal TAB characters followed by `ab`, so

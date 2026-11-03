@@ -120,6 +120,7 @@ dea_ddf <- function(x, y, data = NULL,
 
   beta <- numeric(n); st <- integer(n)
   L <- if (peers) matrix(0, n, nr) else NULL
+  fin <- .lp_final(X, Y, XR, YR)
   for (o in seq_len(n)) {
     if (ideal[o]) {
       beta[o] <- 0; st[o] <- 0L
@@ -127,21 +128,14 @@ dea_ddf <- function(x, y, data = NULL,
       next
     }
     aim(lp, o)
-    st[o] <- solve(lp)
-    ## An INFEASIBLE program (2) is not retried: that is an answer about the
-    ## data, not a conditioning failure. Anything else is worth a fresh object.
-    if (!st[o] %in% c(0L, 1L, 2L)) {
-      lp2 <- build(); aim(lp2, o)
-      st[o] <- solve(lp2)
-      if (st[o] %in% c(0L, 1L)) {
-        beta[o] <- lpSolveAPI::get.objective(lp2)
-        if (peers) L[o, ] <- lpSolveAPI::get.variables(lp2)[-1L]
-        next
-      }
-    }
+    ## The shared three-stage retry. Infeasible (2) is final only where it can
+    ## be an answer -- see .lp_final().
+    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, o); l },
+                         final = fin)
+    st[o] <- z$status
     if (!st[o] %in% c(0L, 1L)) { beta[o] <- NA_real_; next }
-    beta[o] <- lpSolveAPI::get.objective(lp)
-    if (peers) L[o, ] <- lpSolveAPI::get.variables(lp)[-1L]
+    beta[o] <- lpSolveAPI::get.objective(z$lp)
+    if (peers) L[o, ] <- lpSolveAPI::get.variables(z$lp)[-1L]
   }
 
   ## Report DMUs that did not solve. dea_ddf() recorded `status` and then said

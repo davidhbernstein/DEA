@@ -95,6 +95,29 @@
   list(status = st, lp = lp3)
 }
 
+## Which statuses are ANSWERS for a sweep scoring (X, Y) against (XR, YR).
+##
+## Infeasible (2) is an answer about the data only when it CAN be one. When the
+## evaluated set is the reference set, lambda = e_o is feasible for every
+## envelopment program in this package -- radial, slacks-based, additive,
+## directional, cost and revenue -- so a status 2 there is a solver failure and
+## is retried like a 5. Observed once, in the radial sweep (2026-11-02,
+## dea_sim(200, 2, 1, returns = 0.6, seed = 9958), DMU 130); applied to every
+## sweep on the proof, not on a measurement, because the failure is rarer than
+## one fit in 3000 and horserace/false_infeasible_sweep.R could not find it
+## even in the radial sweep with this guard switched off. Against an external
+## reference set infeasibility is real and common -- dea_subsample() loses over
+## half of an efficient DMU's draws to it -- so it stays final there rather than
+## paying for three rebuilds per draw.
+##
+## identical() rather than the front end's `self` flag, because internal
+## callers (dea_rts_test(), dea_subsample(), the bootstrap) reach the sweeps
+## without going through .dea_data(). The caller passes super = TRUE where the
+## DMU is excluded from its own reference set, which makes 2 real again.
+.lp_final <- function(X, Y, XR, YR, super = FALSE) {
+  if (!super && identical(X, XR) && identical(Y, YR)) c(0L, 1L) else c(0L, 1L, 2L)
+}
+
 ## Same three stages for the second-stage slack program, which likewise aims and
 ## solves in one call. Stage three here is UNEXERCISED: every stage-two failure
 ## observed so far -- 56 of them on a 1200-DMU variable-returns fit -- was fixed

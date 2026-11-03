@@ -287,7 +287,11 @@ dea_weak <- function(x, y, bad, data = NULL,
 
   for (o in seq_len(n)) {
     aim(lp, o)
-    r <- .lp_solve_retry(lp, fresh = function() { l2 <- build(); aim(l2, o); l2 })
+    ## Always self-referenced -- the reference set is the sample -- and
+    ## lambda = e_o with beta = 0 satisfies every row, the equality on the bads
+    ## included. So status 2 is never an answer here; see .lp_final().
+    r <- .lp_solve_retry(lp, fresh = function() { l2 <- build(); aim(l2, o); l2 },
+                         final = c(0L, 1L))
     st[o] <- r$status
     if (!r$status %in% c(0L, 1L)) {
       beta[o] <- NA_real_
