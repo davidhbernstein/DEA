@@ -50,6 +50,22 @@ either with the fix switched off, though the known case still reproduces.
 `dea_ddf()` and `dea_add()` also had their own two-stage retry without the
 scaling stage; they now use the shared three-stage one.
 
+## `dea_cross()` no longer loses raters to the solver
+
+The Doyle-Green secondary program had no retry at all, so a solver failure left
+that rater's weights `NA` and its row of `cross_matrix` empty. The only warning
+was the generic "fewer raters" one, which can't tell a solver failure from a
+zero denominator. This was measured, not hypothetical. Over 5,000 simulated
+designs at n = 200 and 600 at n = 600, 4 benevolent raters were lost: three
+status 5 and one false status 2 on an efficient rater. A fresh object recovered
+three. The fourth needed the scaling stage.
+
+The program always has a solution: the rater's own optimal weights satisfy
+every row, and the objective is bounded by the normalisation. So it now uses the
+shared three-stage retry, with only an optimal status treated as final. The same
+sweep then loses no raters. Any rater still lost after every retry gets its own
+warning, naming it as a solver failure.
+
 ## `?dea_rts_test`'s size-and-power table rendered as garbage
 
 Its `\tab` separators had become literal TAB characters followed by `ab`, so

@@ -72,6 +72,20 @@ dea_cross <- function(x, y, data = NULL,
     dg <- .cross_secondary(XR, YR, fit$eff, nr, p, q, scaling,
                            benevolent = identical(secondary, "benevolent"))
     V <- dg$v; U <- dg$u
+    ## Said separately from the "fewer raters" warning below, which cannot tell
+    ## a solver failure from a zero denominator. The program always has an
+    ## answer (see .cross_secondary()), so a rater lost here is a numerical
+    ## failure that survived every retry, not a statement about the data.
+    lost <- !dg$status %in% c(0L, 1L) & is.finite(fit$eff)
+    if (any(lost)) {
+      warning(sum(lost), " rater(s) lost their ", secondary, " weights: the ",
+              "secondary program failed numerically (lpSolve status ",
+              paste(sort(unique(dg$status[lost])), collapse = "/"), ") after ",
+              "every retry, though it always has a solution. Their rows of ",
+              "`cross_matrix` are NA. First: ",
+              paste(utils::head(d$ref[lost], 5), collapse = ", "), ".",
+              call. = FALSE)
+    }
   }
 
   ## E is nr x n: one ROW per rater, one COLUMN per rated DMU.
@@ -165,24 +179,47 @@ dea_cross <- function(x, y, data = NULL,
   sumx <- colSums(Xs); sumy <- colSums(Ys)
 
   nv <- p + q
-  lp <- lpSolveAPI::make.lp(2L + nr, nv)
-  lpSolveAPI::lp.control(lp, sense = if (benevolent) "max" else "min",
-                         epsel = .DEA_CONSTANTS$LP_EPSEL, verbose = "neutral")
-  for (i in seq_len(p)) lpSolveAPI::set.column(lp, i,     c(0, 0, -Xs[, i]))
-  for (r in seq_len(q)) lpSolveAPI::set.column(lp, p + r, c(0, 0,  Ys[, r]))
-  lpSolveAPI::set.constr.type(lp, c("=", "=", rep("<=", nr)))
-  lpSolveAPI::set.rhs(lp, c(1, 0, rep(0, nr)))
-
-  V <- matrix(NA_real_, nr, p); U <- matrix(NA_real_, nr, q)
-  for (dd in seq_len(nr)) {
+  ## Built as a function so the program can be REBUILT: see .lp_solve_retry().
+  build <- function() {
+    lp <- lpSolveAPI::make.lp(2L + nr, nv)
+    lpSolveAPI::lp.control(lp, sense = if (benevolent) "max" else "min",
+                           epsel = .DEA_CONSTANTS$LP_EPSEL, verbose = "neutral")
+    for (i in seq_len(p)) lpSolveAPI::set.column(lp, i,     c(0, 0, -Xs[, i]))
+    for (r in seq_len(q)) lpSolveAPI::set.column(lp, p + r, c(0, 0,  Ys[, r]))
+    lpSolveAPI::set.constr.type(lp, c("=", "=", rep("<=", nr)))
+    lpSolveAPI::set.rhs(lp, c(1, 0, rep(0, nr)))
+    lp
+  }
+  aim <- function(lp, dd) {
     lpSolveAPI::set.row(lp, 1L, c(sumx - Xs[dd, ], rep(0, q)))
     lpSolveAPI::set.row(lp, 2L, c(-theta[dd] * Xs[dd, ], Ys[dd, ]))
     lpSolveAPI::set.objfn(lp, c(rep(0, p), sumy - Ys[dd, ]))
-    st <- solve(lp)
-    if (!st %in% c(0L, 1L)) next
-    z <- lpSolveAPI::get.variables(lp)
-    V[dd, ] <- z[seq_len(p)]; U[dd, ] <- z[p + seq_len(q)]
+  }
+  lp <- build()
+
+  ## THIS PROGRAM HAS NO INFEASIBLE OR UNBOUNDED ANSWER, so only 0 and 1 are
+  ## final. Feasible: d's own optimal multipliers, rescaled to meet row 1,
+  ## satisfy row 2 because theta_d IS their optimum, and every technology row
+  ## because they are a CRS multiplier solution. Bounded: summing the
+  ## technology rows over o != d gives u' sum y_o <= v' sum x_o = 1.
+  ##
+  ## It used to have no retry at all, and a failure left the rater's weights NA
+  ## with only the generic "fewer raters" warning. Measured 2026-11-03 over 5000
+  ## designs at n = 200 and 600 at n = 600: 4 raters lost, all benevolent --
+  ## three status 5 and one FALSE status 2 on an efficient rater. A fresh object
+  ## recovered three; the n = 600 case (seed 30065) failed fresh as well and
+  ## needed the scaling stage, so the whole ladder is needed, not just a rebuild.
+  st <- integer(nr)
+  V <- matrix(NA_real_, nr, p); U <- matrix(NA_real_, nr, q)
+  for (dd in seq_len(nr)) {
+    aim(lp, dd)
+    z <- .lp_solve_retry(lp, function() { l <- build(); aim(l, dd); l },
+                         final = c(0L, 1L))
+    st[dd] <- z$status
+    if (!st[dd] %in% c(0L, 1L)) next
+    v <- lpSolveAPI::get.variables(z$lp)
+    V[dd, ] <- v[seq_len(p)]; U[dd, ] <- v[p + seq_len(q)]
   }
   ## Back into the caller's units, exactly as in .dea_multipliers().
-  list(v = sweep(V, 2L, sc$sx, "/"), u = sweep(U, 2L, sc$sy, "/"))
+  list(v = sweep(V, 2L, sc$sx, "/"), u = sweep(U, 2L, sc$sy, "/"), status = st)
 }

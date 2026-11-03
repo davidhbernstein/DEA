@@ -120,3 +120,39 @@ test_that("ordinary cross-efficiency is unchanged by the NA handling", {
   ## code computed and what the new code must still compute.
   expect_equal(unname(f$eff), unname(colMeans(f$cross_matrix)), tolerance = 1e-12)
 })
+
+test_that("the secondary program recovers raters the reused solver loses", {
+  ## The Doyle-Green program always has a solution, so a lost rater is a solver
+  ## failure. Two of the four found in a 5600-design sweep (2026-11-03): a FALSE
+  ## status 2 on an efficient rater, and a status 5 that a fresh object alone
+  ## does not fix and the scaling stage does. Both used to leave an NA row.
+  for (cs in list(c(31373, 200, 154), c(30065, 600, 39))) {
+    d <- dea_sim(cs[2], p = 3, q = 2, returns = 0.6, seed = cs[1])
+    f <- expect_silent(dea_cross(d$x, d$y, secondary = "benevolent"))
+    expect_true(all(stats::complete.cases(f$v)), info = cs[1])
+    expect_true(all(is.finite(f$cross_matrix[cs[3], ])), info = cs[1])
+    ## The recovered weights satisfy the program they came from: the rater's
+    ## own score is held at theta, and nobody scores above 1 at them.
+    expect_equal(f$cross_matrix[cs[3], cs[3]], f$own[[cs[3]]], tolerance = 1e-7)
+    expect_lte(max(f$cross_matrix[cs[3], ]), 1 + 1e-7)
+  }
+})
+
+test_that("a rater lost after every retry is reported as a solver failure", {
+  ## Unreachable on real data once the retry is in, so forced: every secondary
+  ## solve fails numerically. The warning must name it as a solver failure, not
+  ## leave it to the generic "fewer raters" message.
+  d <- toy(12, 2, 1, 41)
+  real_retry <- .lp_solve_retry
+  local_mocked_bindings(.lp_solve_retry = function(lp, fresh, final) {
+    r <- real_retry(lp, fresh, final); r$status <- 5L; r
+  })
+  w <- character()
+  f <- withCallingHandlers(dea_cross(d$x, d$y, secondary = "aggressive"),
+    warning = function(cond) {
+      w <<- c(w, conditionMessage(cond)); invokeRestart("muffleWarning")
+    })
+  expect_true(any(grepl("lost their aggressive weights", w)))
+  expect_true(any(grepl("status 5", w)))
+  expect_true(all(is.na(f$v)))
+})
