@@ -157,10 +157,12 @@ mean of ratios     \tab 0.050 \tab 0.010 \tab 0.185 \tab 0.780 \cr
 }
 Three things to take from it.
 
-\strong{Prefer \code{mean_of_ratios}.} It dominates on this design, 0.780 against
-0.155 at \eqn{r = 0.6} with a paired \eqn{t} of \eqn{-18.2}, at a size no worse.
-Both are reported because Simar and Wilson give both and because this is one
-design, but nothing measured recommends the ratio of means.
+\strong{On this design \code{mean_of_ratios} is the more powerful statistic},
+0.780 against 0.155 at \eqn{r = 0.6} with a paired \eqn{t} of \eqn{-18.2}, at a
+size no worse. \strong{But in more dimensions its bootstrap version rejects a true
+null far too often} --- see \strong{Size in more dimensions} below --- so read
+this as a statement about \eqn{p = 2}, \eqn{q = 1}, not as a general
+recommendation.
 
 \strong{The size is conservative, not nominal, and the power is low.} At
 \eqn{r = 0.8} the ratio of means rejects 2.0\% of the time, below its own size; at
@@ -222,10 +224,9 @@ improvement}: +0.080 at \eqn{n = 60, r = 0.8} (\eqn{t = 2.6}), nothing at
 is also more conservative: no rejections at all under a true cone at
 \eqn{n = 200}, against 3.5\% for the bootstrap's mean of ratios.
 
-So \code{method = "bootstrap"} remains the default, and its mean of ratios
-remains the statistic to read. Use subsampling as a check that does not rest on
-the 2002 procedure's inconsistency, and expect it to be less willing to reject.
-The chosen \eqn{m} sits low in its grid (median 18--29 at \eqn{n = 200}), the
+On this design, then, the bootstrap's mean of ratios is the best column. In more
+dimensions it is not --- see \strong{Size in more dimensions} --- and there
+subsampling is the method whose size holds. The chosen \eqn{m} sits low in its grid (median 18--29 at \eqn{n = 200}), the
 same tendency \code{\link{dea_subsample}} shows.
 
 \strong{Why it is conservative: the rate, not \eqn{m}.} Fixing \eqn{m} across the
@@ -243,6 +244,49 @@ up to 0.01. It is \strong{not} used, because it was measured on one design
 (\eqn{p = 2}, \eqn{q = 1}, Cobb-Douglas, output oriented). Estimating the rate
 from the data instead would remove the power, since under H1 the statistic
 stops shrinking and the estimated rate goes to zero.
+
+Nor is the gap a constant that could be corrected for. The same measurement
+over nine designs, 100 replications each, \eqn{n} from 50 to 1600:
+\tabular{lrrr}{
+design \tab theory \tab measured \tab 95\% interval \cr
+\eqn{p = 1, q = 1} \tab -0.667 \tab -0.759 \tab [-0.789, -0.728] \cr
+\eqn{p = 2, q = 1} \tab -0.500 \tab -0.594 \tab [-0.613, -0.574] \cr
+\eqn{p = 3, q = 1} \tab -0.400 \tab -0.476 \tab [-0.490, -0.460] \cr
+\eqn{p = 2, q = 2} \tab -0.400 \tab -0.397 \tab [-0.412, -0.382] \cr
+\eqn{p = 3, q = 2} \tab -0.333 \tab -0.303 \tab [-0.315, -0.289] \cr
+CES, \eqn{\rho = -10} \tab -0.500 \tab -0.587 \tab [-0.607, -0.567] \cr
+2 facets \tab -0.500 \tab -0.617 \tab [-0.635, -0.596] \cr
+4 facets, \eqn{p = 3} \tab -0.400 \tab -0.455 \tab [-0.471, -0.439] \cr
+half-normal \eqn{u} \tab -0.500 \tab -0.552 \tab [-0.569, -0.535]
+}
+With one output the statistic falls faster than theory in every design. With
+two it matches theory at \eqn{p = 2} and falls slower at \eqn{p = 3}. The
+inefficiency distribution matters too. So the theoretical rate is kept: it is
+wrong in both directions, and no other single number is less wrong.
+}
+\section{Size in more dimensions}{
+\strong{The bootstrap's \code{mean_of_ratios} over-rejects a true null, badly,
+as the dimension grows.} Rejection rate under a true cone, output oriented,
+\eqn{n = 200}, \code{B = 400}, 200 replications, nominal 5\%:
+\tabular{lrrr}{
+                          \tab p=2, q=1 \tab p=2, q=2 \tab p=3, q=2 \cr
+bootstrap, ratio of means \tab 0.005 \tab 0.000 \tab 0.005 \cr
+bootstrap, mean of ratios \tab 0.020 \tab 0.090 \tab 0.245 \cr
+subsample, ratio of means \tab 0.005 \tab 0.050 \tab 0.045 \cr
+subsample, mean of ratios \tab 0.005 \tab 0.040 \tab 0.035
+}
+Monte Carlo standard errors are 0.030 at most. This is the 2002 procedure and
+not this implementation of it: \code{rDEA::rts.test} rejects 25.0\% of the time
+on the same 200 datasets at \eqn{p = 3, q = 2} (\code{pvalue48}), a paired
+difference of \eqn{-0.005} (se 0.015), and the two packages agree on the
+observed statistic to 6e-8.
+
+So: \strong{subsampling is the only method whose size held in every design
+measured}, at or below nominal, though conservative when \eqn{q = 1}. The
+bootstrap's ratio of means never over-rejects but has little power. The
+bootstrap's mean of ratios is the most powerful at \eqn{p = 2}, \eqn{q = 1} and
+cannot be trusted beyond it. With more than one output, or \eqn{p + q > 3},
+read \code{method = "subsample"}.
 }
 \section{What this test cannot be asked}{
 \strong{On a bounded input support the input-oriented version of this test is not

@@ -27,13 +27,23 @@ weakness under the bootstrap was in the null distribution, not in the statistic.
 The mean of ratios gains 0.080 at n = 60, r = 0.8, nothing at r = 0.6, and loses
 0.060 at n = 200, r = 0.8 (*t* = −3.3). Subsampling is also more conservative,
 with no rejections at all under a true cone at n = 200. So the bootstrap stays the
-default and its mean of ratios stays the statistic to read.
+default -- but see the next paragraph before reading its mean of ratios.
+
+**The bootstrap's mean of ratios over-rejects in more dimensions.** Under a true
+cone at n = 200 it rejects 2.0% of the time at p = 2, q = 1, but **9.0% at
+p = 2, q = 2 and 24.5% at p = 3, q = 2**, at a nominal 5%. `rDEA::rts.test`
+rejects 25.0% on the same datasets, so this is the 2002 procedure, not this
+implementation. Subsampling held its size in all three designs (0.005, 0.040,
+0.035). `?dea_rts_test` used to recommend the bootstrap's mean of ratios without
+qualification. It now has a "Size in more dimensions" section and recommends
+`method = "subsample"` with more than one output or p + q > 3.
 
 Why subsampling is conservative is measured too, and the answer is the rate,
 not the choice of *m*. At fixed *m* the size is at most 0.010, and power falls as
 *m* grows, so the rule's small *m* is right. On a true cone the statistic falls at
-n^−0.594 rather than the n^−0.5 used. That is documented in `?dea_rts_test`, and
-the rate is not changed on the strength of one design.
+n^−0.594 rather than the n^−0.5 used. Over nine designs the gap is not a constant:
+faster than theory with one output, equal at p = 2, q = 2, slower at p = 3,
+q = 2. So the theoretical rate is kept, and the table is in `?dea_rts_test`.
 
 ## A false "infeasible" on a self-referenced radial fit is now retried
 

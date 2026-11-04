@@ -24,8 +24,16 @@
 ## They are not the same number and need not even move together -- the first
 ## weights a DMU by its own level, the second does not.
 ##
-## MEASURED, THE MEAN OF RATIOS IS THE BETTER ONE, and by a long way.  On
-## dea_sim(returns = 1), where H0 is exactly true, the two have size 0.050 and
+## MEASURED AT p = 2, q = 1, THE MEAN OF RATIOS IS THE BETTER ONE -- AND IN MORE
+## DIMENSIONS ITS BOOTSTRAP VERSION OVER-REJECTS (2026-11-04): a true null is
+## rejected 0.090 of the time at p = 2, q = 2 and 0.245 at p = 3, q = 2 (n = 200,
+## nominal 0.05; horserace/rts_size_designs.R), and rDEA does the same on the
+## same datasets (0.250, paired difference -0.005, se 0.015), so it is the 2002
+## procedure. Subsampling held its size in all three designs. ?dea_rts_test,
+## "Size in more dimensions", has the table. What follows is the p = 2, q = 1
+## measurement that first recommended the mean of ratios.
+##
+## On dea_sim(returns = 1), where H0 is exactly true, the two have size 0.050 and
 ## 0.025 at n = 60 against a nominal 0.05; at returns = 0.6 they have power 0.780
 ## and 0.155, a paired difference of -0.625 with t = -18.2.  Both are reported
 ## because Simar and Wilson give both and because that is one design, but nothing
