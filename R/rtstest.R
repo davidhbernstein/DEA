@@ -175,6 +175,17 @@
 ## at n = 200, r = 0.8 (t = -3.3), with size falling to 0.000 at n = 200. The
 ## bootstrap's mean of ratios remains the statistic to read.
 ##
+## WHY IT IS CONSERVATIVE: THE RATE, NOT m (2026-11-04).  With m fixed across
+## the grid at n = 200 (horserace/rts_subsample_m_experiment.R) the size is
+## 0.010 at m = 18 and 0.000 everywhere above, and power against r = 0.8 FALLS
+## with m, 0.955 to 0.695 -- so the rule's habit of choosing small m is right.
+## What is off is kappa: on a true cone 1 - S_n falls at n^-0.594 [-0.621,
+## -0.566] (horserace/rts_stat_rate.R), not n^-0.5. Recomputed from the same
+## draws, kappa = 0.594 would have given size 0.045 and power 0.990 at m = 29.
+## Not adopted: one design, and an estimated rate would go to zero under H1 and
+## take the power with it. The theoretical rate stays until something better
+## than one design says otherwise.
+##
 ## THE P-VALUE IS (count + 1)/(B + 1), not count/B.  The observed statistic is
 ## itself a draw under H0, so including it is the standard Monte Carlo
 ## correction, and it means the reported p-value is never exactly zero -- which

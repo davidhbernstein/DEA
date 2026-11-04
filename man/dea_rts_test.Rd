@@ -227,6 +227,22 @@ remains the statistic to read. Use subsampling as a check that does not rest on
 the 2002 procedure's inconsistency, and expect it to be less willing to reject.
 The chosen \eqn{m} sits low in its grid (median 18--29 at \eqn{n = 200}), the
 same tendency \code{\link{dea_subsample}} shows.
+
+\strong{Why it is conservative: the rate, not \eqn{m}.} Fixing \eqn{m} across the
+whole grid at \eqn{n = 200} (same datasets, 200 replications) gives a size of
+0.010 at \eqn{m = 18} and 0.000 from \eqn{m = 29} to 117. Power against
+\eqn{r = 0.8} falls steadily as \eqn{m} grows: 0.955, 0.945, 0.895, 0.845,
+0.695. So the small \eqn{m} the rule picks is the best choice on both counts. What
+makes the test conservative is \eqn{\kappa}. On \code{dea_sim(returns = 1)} at
+\eqn{n} from 50 to 1600, \eqn{1 - S_n} falls at \eqn{n^{-0.594}} (95\% interval
+\eqn{-0.621} to \eqn{-0.566}), faster than the \eqn{n^{-0.5}} assumed here. Had
+the test used 0.594, its size at \eqn{m = 29} would have been about 0.045 and its
+power about 0.990. That is a recomputation from the same draws, rejecting when
+\eqn{\tau_n} exceeds the 95\% quantile, which differs from the p-value rule by
+up to 0.01. It is \strong{not} used, because it was measured on one design
+(\eqn{p = 2}, \eqn{q = 1}, Cobb-Douglas, output oriented). Estimating the rate
+from the data instead would remove the power, since under H1 the statistic
+stops shrinking and the estimated rate goes to zero.
 }
 \section{What this test cannot be asked}{
 \strong{On a bounded input support the input-oriented version of this test is not

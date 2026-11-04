@@ -29,6 +29,12 @@ The mean of ratios gains 0.080 at n = 60, r = 0.8, nothing at r = 0.6, and loses
 with no rejections at all under a true cone at n = 200. So the bootstrap stays the
 default and its mean of ratios stays the statistic to read.
 
+Why subsampling is conservative is measured too, and the answer is the rate,
+not the choice of *m*. At fixed *m* the size is at most 0.010, and power falls as
+*m* grows, so the rule's small *m* is right. On a true cone the statistic falls at
+n^−0.594 rather than the n^−0.5 used. That is documented in `?dea_rts_test`, and
+the rate is not changed on the strength of one design.
+
 ## A false "infeasible" on a self-referenced radial fit is now retried
 
 The reused LP object can report status 2 for a program that is provably
