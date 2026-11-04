@@ -11,13 +11,24 @@
   TOL_SLACK  = 1e-8,   ## a slack below this is zero
   LP_EPSEL   = 1e-12,  ## lpSolveAPI rounding epsilon
   MIN_POS    = 1e-12,  ## floor for a denominator that must be positive
-  ## Scaling modes to try, in order, when a FRESH program still fails. These
-  ## are the second remedy, not a variant of the first: rebuilding fixes the
-  ## basis-state class and does nothing for this one, while rescaling fixes
-  ## this one and fixed at most a quarter of the other. "range" recovered all
-  ## five observed cases, "mean" four of them, which is the order. See the
-  ## long note at .lp_solve_retry().
-  LP_SCALING_FALLBACK = c("range", "mean")
+  ## Solver settings to try, in order, each on a FRESH program, when the plain
+  ## rebuild still fails. These are the second remedy, not a variant of the
+  ## first: rebuilding fixes the basis-state class and does nothing for this
+  ## one. "range" recovered all five cases observed in September, "mean" four,
+  ## which is the order of the first two.
+  ##
+  ## The PRIMAL SIMPLEX is last, added 2026-11-04. A sweep of 160,000 fits at
+  ## n = 50 left 3 DMUs unsolved after both scaling modes, all output-oriented
+  ## vrs and all undominated in every input -- the degenerate-vertex class --
+  ## plus a fourth found by horserace/rts_stat_rate.R (seed 41404). lpSolve's
+  ## default is the dual simplex in phase 1; switching both phases to primal
+  ## recovered all four, every scaling mode at most two. Each recovered value is
+  ## phi = 1, matching Benchmarking and the duality argument at
+  ## .lp_solve_retry(). It is last so that every case the scaling modes already
+  ## recovered gets exactly the answer it got before.
+  LP_FALLBACK = list(list(scaling = "range"),
+                     list(scaling = "mean"),
+                     list(simplextype = c("primal", "primal")))
 )
 
 `%||%` <- function(a, b) if (is.null(a)) b else a

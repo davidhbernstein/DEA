@@ -274,9 +274,20 @@ dea <- function(x, y, data = NULL,
     ## error. Measured on a 40-DMU super-efficiency fit: four DMUs returned
     ## status 2 on the reused object under crs, and a fresh object solved all
     ## four to optimality.
+    ##
+    ## And then the same fallback settings as the envelopment ladder. Until
+    ## 2026-11-04 this stopped after the rebuild, and the degenerate-vertex DMU
+    ## that needs the primal simplex in the primal program (dea_sim(50, 2, 1,
+    ## returns = 1, seed = 41404), DMU 28) failed here too, with status 5.
     if (!r$status %in% c(0L, 1L, 3L)) {
       M2 <- .lp_mult_build(XRs, YRs, rts, orientation)
       r  <- .lp_mult_at(M2, Xs, Ys, o, exclude = if (super) o else NULL)
+      for (opt in .DEA_CONSTANTS$LP_FALLBACK) {
+        if (r$status %in% c(0L, 1L, 3L)) break
+        M3 <- .lp_mult_build(XRs, YRs, rts, orientation)
+        .lp_control(M3$lp, opt)
+        r  <- .lp_mult_at(M3, Xs, Ys, o, exclude = if (super) o else NULL)
+      }
     }
     V[o, ] <- r$v; U[o, ] <- r$u; u0[o] <- r$u0; st[o] <- r$status
   }

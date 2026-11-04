@@ -73,22 +73,30 @@
 ## `fresh` must return a newly built program already aimed at the same DMU.
 ## Returning the lp that produced the status lets the caller read its results
 ## without knowing which of the two it got.
+## Apply one entry of .DEA_CONSTANTS$LP_FALLBACK (a list of lp.control()
+## settings) to a program; NULL leaves it alone.
+.lp_control <- function(lp, opt) {
+  if (length(opt)) invisible(do.call(lpSolveAPI::lp.control, c(list(lp), opt)))
+  invisible(lp)
+}
+
 .lp_solve_retry <- function(lp, fresh, final = c(0L, 1L, 2L)) {
   st <- solve(lp)
   if (st %in% final) return(list(status = st, lp = lp))
   lp2 <- fresh()
   st <- solve(lp2)
   if (st %in% final) return(list(status = st, lp = lp2))
-  ## STAGE THREE: a fresh object with a different scaling mode. See the second
+  ## STAGE THREE: a fresh object with different solver settings -- the scaling
+  ## modes, then the primal simplex (.DEA_CONSTANTS$LP_FALLBACK). See the second
   ## half of the note above -- rebuilding cannot help a program that fails
-  ## identically however often it is rebuilt, and for that class a scaling
-  ## change does. Applied to the object `fresh()` returns rather than asking
-  ## every builder for a scaling argument: lpSolveAPI applies scaling at solve
-  ## time, so setting it after the program is aimed gives the same answer as
-  ## setting it before (checked both ways on a failing program).
-  for (mode in .DEA_CONSTANTS$LP_SCALING_FALLBACK) {
+  ## identically however often it is rebuilt, and for that class a change of
+  ## settings does. Applied to the object `fresh()` returns rather than asking
+  ## every builder for an argument: lpSolveAPI applies these at solve time, so
+  ## setting them after the program is aimed gives the same answer as setting
+  ## them before (checked both ways for scaling on a failing program).
+  for (opt in .DEA_CONSTANTS$LP_FALLBACK) {
     lp3 <- fresh()
-    invisible(lpSolveAPI::lp.control(lp3, scaling = mode))
+    .lp_control(lp3, opt)
     st <- solve(lp3)
     if (st %in% final) return(list(status = st, lp = lp3))
   }
@@ -131,15 +139,15 @@
   z <- .lp_slack_at(S, rhs_x, rhs_y)          # the hot path, as above
   if (z$status %in% c(0L, 1L)) return(z)
   ok <- function(z) z$status %in% c(0L, 1L)
-  fresh <- function(mode = NULL) {
+  fresh <- function(opt = NULL) {
     S2 <- .lp_slack_build(XRs, YRs, rts, nd_x, nd_y)
-    if (!is.null(mode)) invisible(lpSolveAPI::lp.control(S2$lp, scaling = mode))
+    .lp_control(S2$lp, opt)
     S2
   }
   z <- .lp_slack_at(fresh(), rhs_x, rhs_y)
   if (ok(z)) return(z)
-  for (mode in .DEA_CONSTANTS$LP_SCALING_FALLBACK) {
-    z <- .lp_slack_at(fresh(mode), rhs_x, rhs_y)
+  for (opt in .DEA_CONSTANTS$LP_FALLBACK) {
+    z <- .lp_slack_at(fresh(opt), rhs_x, rhs_y)
     if (ok(z)) return(z)
   }
   z
@@ -165,15 +173,15 @@
   r <- .lp_radial_at(B, Xs, Ys, o, exclude = exclude, fixed = fixed)
   if (r$status %in% final) return(r)
   ok <- function(r) r$status %in% final
-  fresh <- function(mode = NULL) {
+  fresh <- function(opt = NULL) {
     B2 <- .lp_radial_build(XRs, YRs, rts, orientation)
-    if (!is.null(mode)) invisible(lpSolveAPI::lp.control(B2$lp, scaling = mode))
+    .lp_control(B2$lp, opt)
     B2
   }
   r <- .lp_radial_at(fresh(), Xs, Ys, o, exclude = exclude, fixed = fixed)
   if (ok(r)) return(r)
-  for (mode in .DEA_CONSTANTS$LP_SCALING_FALLBACK) {
-    r <- .lp_radial_at(fresh(mode), Xs, Ys, o, exclude = exclude, fixed = fixed)
+  for (opt in .DEA_CONSTANTS$LP_FALLBACK) {
+    r <- .lp_radial_at(fresh(opt), Xs, Ys, o, exclude = exclude, fixed = fixed)
     if (ok(r)) return(r)
   }
   r

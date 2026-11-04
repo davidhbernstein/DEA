@@ -369,10 +369,10 @@ test_that("the rescale stage is what recovers it, not the rebuild", {
   }
   ## Stage two: a brand-new object, repeatedly. Status 5 every time.
   for (i in 1:3) expect_equal(at(NULL)$status, 5L)
-  ## Stage three: the first fallback mode. The order in LP_SCALING_FALLBACK is
+  ## Stage three: the first fallback setting. The order in LP_FALLBACK is
   ## "range" then "mean" because "range" recovered all five cases and "mean"
   ## four, so the head of that list must be the one that works here.
-  first <- .DEA_CONSTANTS$LP_SCALING_FALLBACK[1]
+  first <- .DEA_CONSTANTS$LP_FALLBACK[[1]]$scaling
   expect_equal(at(first)$status, 0L)
   expect_equal(at(first)$eff, 1, tolerance = 1e-9)
   ## And the whole escalation, driven through the helper the sweep uses.
@@ -458,4 +458,34 @@ test_that("every sweep treats status 2 as final only where it can be an answer",
   bad <- d$y * 0.5 + 0.1
   expect_identical(finals(suppressWarnings(dea_weak(d$x, d$y, bad = bad))),
                    list(c(0L, 1L)))
+})
+
+test_that("the primal simplex recovers what no scaling mode does", {
+  ## Found 2026-11-04. Four output-oriented vrs DMUs, each undominated in every
+  ## input, failed the whole reused -> fresh -> range -> mean ladder with
+  ## status 5. Seed 51387 is one that every scaling mode fails; the primal
+  ## simplex, the last rung of LP_FALLBACK, solves it. The answer must be 1:
+  ## lambda = e_o makes phi >= 1, and the dual is feasible at 1.
+  s <- dea_sim(50, p = 2, q = 1, returns = 0.9, seed = 51387)
+  sc <- .dea_scale(s$x, s$y, TRUE)
+  at <- function(opt) {
+    B <- .lp_radial_build(sc$X, sc$Y, "vrs", "out"); .lp_control(B$lp, opt)
+    .lp_radial_at(B, sc$X, sc$Y, 40L, exclude = NULL)
+  }
+  for (opt in .DEA_CONSTANTS$LP_FALLBACK[1:2]) expect_equal(at(opt)$status, 5L)
+  expect_equal(at(NULL)$status, 5L)
+  expect_identical(.DEA_CONSTANTS$LP_FALLBACK[[3]]$simplextype, c("primal", "primal"))
+  expect_equal(at(.DEA_CONSTANTS$LP_FALLBACK[[3]])$status, 0L)
+
+  f <- expect_silent(dea(s$x, s$y, rts = "vrs", orientation = "out"))
+  expect_equal(f$eff[[40]], 1, tolerance = 1e-9)
+  expect_true(all(f$status == 0L))
+
+  ## The dual of seed 41404's failing DMU needed the same rung, and the
+  ## multiplier ladder did not have it.
+  s2 <- dea_sim(50, p = 2, q = 1, returns = 1, seed = 41404)
+  m <- expect_silent(dea(s2$x, s2$y, rts = "vrs", orientation = "out",
+                         multipliers = TRUE))
+  expect_true(all(m$status == 0L))
+  expect_equal(m$eff[[28]], 1, tolerance = 1e-9)
 })

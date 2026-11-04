@@ -50,6 +50,21 @@ either with the fix switched off, though the known case still reproduces.
 `dea_ddf()` and `dea_add()` also had their own two-stage retry without the
 scaling stage; they now use the shared three-stage one.
 
+## A last rung on the solver retry: the primal simplex
+
+The retry for a numerically failed LP went reused object, fresh object, fresh
+with "range" scaling, fresh with "mean" scaling. A sweep of 160,000 fits at
+n = 50 left 3 DMUs unsolved even so, and a fourth turned up elsewhere. All four
+were output-oriented vrs and undominated in every input, the degenerate-vertex
+case. The scaling modes recovered at most two of them. Solving with the primal
+simplex instead of lpSolve's default dual phase 1 recovered all four. Each
+answer is phi = 1, which matches `Benchmarking` and the duality bound.
+
+That is now the last rung, in every sweep. It comes after the scaling modes, so
+every case they already recovered gets exactly the answer it got before. The
+multiplier (dual) programs used to stop after one rebuild, and one of these DMUs
+failed there too; they now climb the same ladder.
+
 ## `dea_cross()` no longer loses raters to the solver
 
 The Doyle-Green secondary program had no retry at all, so a solver failure left

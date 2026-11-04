@@ -235,6 +235,13 @@ dea_wr <- function(x, y, restrictions, data = NULL,
       if (!identical(r$status, 2L)) {
         M2 <- .lp_mult_build(XRs, YRs, rts, orientation, restrict = R)
         r <- .lp_mult_at(M2, Xs, Ys, o)
+        ## Then the fallback settings, as in every other sweep.
+        for (opt in .DEA_CONSTANTS$LP_FALLBACK) {
+          if (r$status %in% c(0L, 1L, 2L)) break
+          M3 <- .lp_mult_build(XRs, YRs, rts, orientation, restrict = R)
+          .lp_control(M3$lp, opt)
+          r <- .lp_mult_at(M3, Xs, Ys, o)
+        }
       }
     }
     st[o] <- r$status
