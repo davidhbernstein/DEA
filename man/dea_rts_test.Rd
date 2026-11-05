@@ -6,15 +6,15 @@
 \description{
 Test whether the technology as a whole may be taken to be constant-returns (or
 non-increasing-returns) against the variable-returns alternative, by the
-bootstrap of Simar and Wilson (2002) or the \eqn{m} out of \eqn{n}
-subsampling of Simar and Wilson (2011). Where \code{\link{dea_rts}} classifies
+\eqn{m} out of \eqn{n} subsampling of Simar and Wilson (2011), the default, or
+the bootstrap of Simar and Wilson (2002). Where \code{\link{dea_rts}} classifies
 each DMU with no standard error attached, this attaches a p-value to a statement
 about the sample.
 }
 \usage{
 dea_rts_test(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
              orientation = c("in", "out"),
-             method = c("bootstrap", "subsample"), B = 2000, alpha = 0.05,
+             method = c("subsample", "bootstrap"), B = 2000, alpha = 0.05,
              bw = c("silverman", "nrd0", "ucv", "sj"),
              m = NULL, m_grid = NULL, B_select = 200L, window = 3L,
              seed = NULL, ncores = 1L, progress = interactive(),
@@ -32,16 +32,19 @@ dea_rts_test(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
 \code{"drs"} and \code{"irs"} are accepted, as elsewhere in this package.}
 \item{orientation}{\code{"in"} or \code{"out"}, as in \code{\link{dea}}. Read
 \strong{What this test cannot be asked} below before choosing \code{"in"}.}
-\item{method}{How the null distribution is obtained: \code{"bootstrap"}, the
-smoothed bootstrap of Simar and Wilson (2002), or \code{"subsample"}, the
-\eqn{m} out of \eqn{n} subsampling of Simar and Wilson (2011). See
-\strong{Subsampling} below.}
+\item{method}{How the null distribution is obtained: \code{"subsample"}, the
+\eqn{m} out of \eqn{n} subsampling of Simar and Wilson (2011), the default; or
+\code{"bootstrap"}, the smoothed bootstrap of Simar and Wilson (2002). The
+default was the bootstrap until 1.0.3, and changed because the bootstrap's
+\code{mean_of_ratios} rejects a true null far too often in more dimensions: see
+\strong{Size in more dimensions}. Below \eqn{n = 8} subsampling cannot choose
+\eqn{m}, so pass \code{m} or use the bootstrap.}
 \item{B}{Bootstrap replications, or subsamples under
 \code{method = "subsample"}. The p-value's resolution is
 \eqn{1/(B+1)}, so a small \code{B} is not merely imprecise, it is a floor on
 how small a p-value can be reported; \code{B} below 200 warns.}
-\item{alpha}{Nominal level, used for \code{reject} and for the simultaneous
-level applied to the per-DMU tests.}
+\item{alpha}{Nominal level, used for \code{reject} and, under the bootstrap, for
+the simultaneous level applied to the per-DMU tests.}
 \item{bw}{Bandwidth for the kernel that smooths the resampled efficiencies, as
 in \code{\link{dea_boot}}, or a single positive number. Bootstrap only.}
 \item{m}{Subsample size, \eqn{3 \le m < n}. \code{NULL} chooses it by
@@ -226,7 +229,9 @@ is also more conservative: no rejections at all under a true cone at
 
 On this design, then, the bootstrap's mean of ratios is the best column. In more
 dimensions it is not --- see \strong{Size in more dimensions} --- and there
-subsampling is the method whose size holds. The chosen \eqn{m} sits low in its grid (median 18--29 at \eqn{n = 200}), the
+subsampling is the method whose size holds, which is why it is the default.
+At \eqn{p = 2}, \eqn{q = 1} with a few hundred DMUs, \code{method = "bootstrap"}
+and its mean of ratios is the more powerful choice and its size holds. The chosen \eqn{m} sits low in its grid (median 18--29 at \eqn{n = 200}), the
 same tendency \code{\link{dea_subsample}} shows.
 
 \strong{Why it is conservative: the rate, not \eqn{m}.} Fixing \eqn{m} across the
@@ -286,7 +291,7 @@ measured}, at or below nominal, though conservative when \eqn{q = 1}. The
 bootstrap's ratio of means never over-rejects but has little power. The
 bootstrap's mean of ratios is the most powerful at \eqn{p = 2}, \eqn{q = 1} and
 cannot be trusted beyond it. With more than one output, or \eqn{p + q > 3},
-read \code{method = "subsample"}.
+use subsampling --- which is why it is the default.
 }
 \section{What this test cannot be asked}{
 \strong{On a bounded input support the input-oriented version of this test is not
@@ -341,15 +346,18 @@ efficiency, \code{\link{dea_boot}} for the resampling scheme this builds on,
 \code{\link{dea_subsample}} for the subsampling machinery.}
 \examples{
 sim <- dea_sim(80, p = 2, q = 1, returns = 0.6, seed = 2)
-## Output oriented: see 'What this test cannot be asked' above.
-r <- dea_rts_test(sim$x, sim$y, orientation = "out", B = 299, seed = 1,
-                  progress = FALSE)
+## Output oriented: see 'What this test cannot be asked' above. Subsampling,
+## the default, picks m by minimum volatility; r$m is the one it chose.
+## B_select is cut from its default of 200 only to keep the example quick.
+r <- dea_rts_test(sim$x, sim$y, orientation = "out", B = 299, B_select = 50,
+                  seed = 1, progress = FALSE)
 r
-## The two aggregations are different tests, and on this design they disagree.
 head(r$table)
 \donttest{
-## The m out of n version: the same statistic, a different null distribution.
-dea_rts_test(sim$x, sim$y, orientation = "out", method = "subsample",
-             B = 299, seed = 1, progress = FALSE)
+## The 2002 bootstrap: the same statistic, a different null distribution, and
+## per-DMU tests, which subsampling cannot give.
+b <- dea_rts_test(sim$x, sim$y, orientation = "out", method = "bootstrap",
+                  B = 299, seed = 1, progress = FALSE)
+head(b$table)
 }
 }

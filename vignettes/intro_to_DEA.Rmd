@@ -153,17 +153,22 @@ orientations project to different points.
 That table has no standard error in it. A DMU whose constant- and
 variable-returns scores differ by 0.001 is classified exactly as confidently as
 one whose scores differ by 0.4, and nothing in it says whether the *technology*
-may be taken to be a cone. `dea_rts_test()` answers that second question by
-bootstrap.
+may be taken to be a cone. `dea_rts_test()` answers that second question, by
+default with the *m* out of *n* subsampling of Simar and Wilson (2011). Here it
+is applied to the simulated sample from above, whose truth is known:
 
 ```{r}
-dea_rts_test(x, y, orientation = "out", B = 200, seed = 1, progress = FALSE)
+dea_rts_test(sim$x, sim$y, orientation = "out", B = 200, seed = 1,
+             progress = FALSE)
 ```
 
-It does not reject, although this technology is not constant-returns ---
-`dea_sim()` drew it with `returns = 0.9`. That is a statement about power at
-n = 150 and a 10% departure, not a verdict, and it is the usual situation: these
-tests need either a large sample or a large departure.
+It rejects at 5%, which is right: `dea_sim()` drew this technology with
+`returns = 0.9`, so it is not constant-returns. A 10% departure at n = 150 is
+near the edge of what these tests can see, and the 2002 bootstrap
+(`method = "bootstrap"`) on the same data does not reject. One sample settles
+nothing about power either way; `?dea_rts_test` has the measured size and power
+of both methods, including the designs where the bootstrap rejects a true null
+far too often.
 
 Two things to read before using it. The statistic lies in (0, 1] and the test
 rejects for **small** values, in both orientations. And the **output**

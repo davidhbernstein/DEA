@@ -175,13 +175,16 @@
 ## rather than being quietly computed from whatever draws happened to include
 ## the DMU.
 ##
-## MEASURED, IT REPAIRS ONE STATISTIC AND NOT THE OTHER, which is why it is not
-## the default.  horserace/rts_subsample_experiment.R, both methods on the same
+## MEASURED AT p = 2, q = 1, IT REPAIRS ONE STATISTIC AND NOT THE OTHER, which
+## first kept it from being the default -- until the size measurements in more
+## dimensions (below and at the top) made it the default after all.
+## horserace/rts_subsample_experiment.R, both methods on the same
 ## datasets, 200 replications: the ratio of means gains 0.245, 0.590 and 0.445
 ## in power (t = 8.0, 16.6, 12.6) and ends level with the mean of ratios. The mean
 ## of ratios gains 0.080 at n = 60, r = 0.8, nothing at r = 0.6, and LOSES 0.060
-## at n = 200, r = 0.8 (t = -3.3), with size falling to 0.000 at n = 200. The
-## bootstrap's mean of ratios remains the statistic to read.
+## at n = 200, r = 0.8 (t = -3.3), with size falling to 0.000 at n = 200. At
+## p = 2, q = 1 the bootstrap's mean of ratios is the better test; beyond it,
+## it is not a valid one.
 ##
 ## WHY IT IS CONSERVATIVE: THE RATE, NOT m (2026-11-04).  With m fixed across
 ## the grid at n = 200 (horserace/rts_subsample_m_experiment.R) the size is
@@ -209,7 +212,7 @@
 
 dea_rts_test <- function(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
                          orientation = c("in", "out"),
-                         method = c("bootstrap", "subsample"),
+                         method = c("subsample", "bootstrap"),
                          B = 2000, alpha = 0.05,
                          bw = c("silverman", "nrd0", "ucv", "sj"),
                          m = NULL, m_grid = NULL, B_select = 200L, window = 3L,
@@ -220,7 +223,14 @@ dea_rts_test <- function(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
   .dea_check_data_arg(data)
   h0 <- .match_arg_ci(h0, c("crs", "nirs", "ndrs"), "h0")
   orientation <- .match_arg_ci(orientation, c("in", "out"), "orientation")
-  method <- .match_arg_ci(method, c("bootstrap", "subsample"), "method")
+  ## SUBSAMPLING IS THE DEFAULT since 2026-11-04, and the reason is size. Under
+  ## a true cone at n = 200 the bootstrap's mean of ratios rejects 0.090 of the
+  ## time at p = 2, q = 2 and 0.245 at p = 3, q = 2 (rDEA: 0.250), while
+  ## subsampling stays at or below nominal in every design measured. The cost is
+  ## power at p = 2, q = 1, where the bootstrap's mean of ratios is the best
+  ## column (0.985 against 0.925 at n = 200, r = 0.8) and its size holds. See
+  ## ?dea_rts_test, "Size in more dimensions".
+  method <- .match_arg_ci(method, c("subsample", "bootstrap"), "method")
   if (!is.numeric(B) || length(B) != 1L || B < 2) {
     stop("`B` must be a single number of bootstrap replications, at least 2.",
          call. = FALSE)
@@ -364,7 +374,10 @@ dea_rts_test <- function(x, y, data = NULL, h0 = c("crs", "nirs", "ndrs"),
     }
 
     if (is.null(m)) {
-      grid <- .sub_grid(m_grid, n)
+      grid <- tryCatch(.sub_grid(m_grid, n), error = function(e) {
+        stop(conditionMessage(e), " Or use method = \"bootstrap\", which needs ",
+             "no subsample.", call. = FALSE)
+      })
       if (progress) cat("  selecting m over", length(grid), "candidates\n")
       ## The volatility rule applied to the CRITICAL VALUE -- the quantity the
       ## test's verdict actually depends on -- rather than to an interval end.

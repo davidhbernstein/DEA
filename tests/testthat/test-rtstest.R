@@ -11,7 +11,7 @@ test_that("the observed statistic matches rDEA and npsf", {
   ref <- ref_values("rts_test_reference.csv")
   for (i in seq_len(nrow(ref))) {
     d <- toy(ref$n[i], 2, 1, ref$seed[i], returns = ref$returns[i])
-    r <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = ref$orientation[i],
+    r <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, orientation = ref$orientation[i],
                                        h0 = ref$h0[i], B = 2, seed = 1,
                                        progress = FALSE))
     expect_equal(r$statistic[["ratio_of_means"]], ref$ratio_of_means[i],
@@ -28,7 +28,7 @@ test_that("the statistic is the aggregation of dea_rts()'s own scale efficiency"
   d <- toy(40, 2, 1, 5, returns = 0.7)
   for (ori in c("in", "out")) {
     g <- dea_rts(d$x, d$y, orientation = ori)$table
-    r <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = ori, B = 2,
+    r <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, orientation = ori, B = 2,
                                        seed = 1, progress = FALSE))
     expect_equal(r$table$scale_eff, g$scale_eff, tolerance = 1e-10)
     expect_equal(r$statistic[["mean_of_ratios"]], mean(g$scale_eff),
@@ -44,8 +44,8 @@ test_that("the nirs null sits between the crs null and vrs", {
   ## ordered and so are the statistics. This is an identity of the programs and
   ## does not depend on the data.
   d <- toy(40, 2, 1, 17, returns = 0.6)
-  a <- suppressWarnings(dea_rts_test(d$x, d$y, h0 = "crs",  B = 2, seed = 1, progress = FALSE))
-  b <- suppressWarnings(dea_rts_test(d$x, d$y, h0 = "nirs", B = 2, seed = 1, progress = FALSE))
+  a <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, h0 = "crs",  B = 2, seed = 1, progress = FALSE))
+  b <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, h0 = "nirs", B = 2, seed = 1, progress = FALSE))
   expect_true(all(a$eff_h0 <= b$eff_h0 + 1e-9))
   expect_true(all(b$eff_h0 <= b$eff_vrs + 1e-9))
   expect_lte(a$statistic[["ratio_of_means"]], b$statistic[["ratio_of_means"]] + 1e-9)
@@ -54,7 +54,7 @@ test_that("the nirs null sits between the crs null and vrs", {
 
 test_that("the p-value is a valid Monte Carlo p-value", {
   d <- toy(30, 2, 1, 3, returns = 0.8)
-  r <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 39,
+  r <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, orientation = "out", B = 39,
                                      seed = 4, progress = FALSE))
   ## (count + 1)/(B + 1): never 0, never above 1, and at least 1/(B+1).
   expect_true(all(r$p_value >= 1 / (r$B + 1) - 1e-12))
@@ -72,7 +72,7 @@ test_that("the p-value is a valid Monte Carlo p-value", {
 test_that("the seed makes it reproducible and does not disturb the stream", {
   d <- toy(30, 2, 1, 6, returns = 0.8)
   f <- function(seed) suppressWarnings(
-    dea_rts_test(d$x, d$y, orientation = "out", B = 19, seed = seed, progress = FALSE))
+    dea_rts_test(method = "bootstrap", d$x, d$y, orientation = "out", B = 19, seed = seed, progress = FALSE))
   expect_equal(f(11)$p_value, f(11)$p_value)
   expect_false(isTRUE(all.equal(f(11)$boot[, 1], f(12)$boot[, 1])))
   set.seed(99); before <- runif(1)
@@ -86,9 +86,9 @@ test_that("a true cone is not rejected output-oriented, and a DRS design is", {
   ## returns = 0.5 is as far from one as this generator goes.
   cone <- dea_sim(80, p = 2, q = 1, returns = 1.0, seed = 11)
   drs  <- dea_sim(80, p = 2, q = 1, returns = 0.5, seed = 11)
-  a <- suppressWarnings(dea_rts_test(cone$x, cone$y, orientation = "out",
+  a <- suppressWarnings(dea_rts_test(method = "bootstrap", cone$x, cone$y, orientation = "out",
                                      B = 199, seed = 2, progress = FALSE))
-  b <- suppressWarnings(dea_rts_test(drs$x, drs$y, orientation = "out",
+  b <- suppressWarnings(dea_rts_test(method = "bootstrap", drs$x, drs$y, orientation = "out",
                                      B = 199, seed = 2, progress = FALSE))
   expect_gt(a$p_value[["mean_of_ratios"]], 0.05)
   expect_lt(b$p_value[["mean_of_ratios"]], 0.05)
@@ -105,7 +105,7 @@ test_that("the support gate fires where the vrs program provably cannot follow",
   cone <- dea_sim(60, p = 2, q = 1, returns = 1.0, seed = 11)
   w <- character()
   r <- withCallingHandlers(
-    dea_rts_test(cone$x, cone$y, orientation = "in", B = 19, seed = 1,
+    dea_rts_test(method = "bootstrap", cone$x, cone$y, orientation = "in", B = 19, seed = 1,
                  progress = FALSE),
     warning = function(cond) {
       w <<- c(w, conditionMessage(cond)); invokeRestart("muffleWarning")
@@ -120,33 +120,33 @@ test_that("the support gate fires where the vrs program provably cannot follow",
                !apply(sweep(X * r$eff_h0, 2L, apply(X, 2L, min), "<"), 1L, any))
 
   ## Output-oriented on the same data, hardly anything is flagged.
-  o <- suppressWarnings(dea_rts_test(cone$x, cone$y, orientation = "out",
+  o <- suppressWarnings(dea_rts_test(method = "bootstrap", cone$x, cone$y, orientation = "out",
                                      B = 19, seed = 1, progress = FALSE))
   expect_lt(mean(!o$reachable), 0.25)
 })
 
 test_that("arguments are validated and technology aliases are honoured", {
   d <- toy(30, 2, 1, 8, returns = 0.8)
-  expect_error(dea_rts_test(d$x, d$y, B = 1), "at least 2")
-  expect_error(dea_rts_test(d$x, d$y, alpha = 0), "\\(0, 1\\)")
-  expect_error(dea_rts_test(d$x, d$y, alpha = 1), "\\(0, 1\\)")
-  expect_error(dea_rts_test(d$x, d$y, h0 = "vrs"), "h0")
-  expect_error(dea_rts_test(d$x, d$y, orientation = "both"), "orientation")
-  expect_error(dea_rts_test(d$x, d$y, "crs"), "`data` must be")
-  expect_warning(dea_rts_test(d$x, d$y, orientation = "out", B = 5,
+  expect_error(dea_rts_test(method = "bootstrap", d$x, d$y, B = 1), "at least 2")
+  expect_error(dea_rts_test(method = "bootstrap", d$x, d$y, alpha = 0), "\\(0, 1\\)")
+  expect_error(dea_rts_test(method = "bootstrap", d$x, d$y, alpha = 1), "\\(0, 1\\)")
+  expect_error(dea_rts_test(method = "bootstrap", d$x, d$y, h0 = "vrs"), "h0")
+  expect_error(dea_rts_test(method = "bootstrap", d$x, d$y, orientation = "both"), "orientation")
+  expect_error(dea_rts_test(method = "bootstrap", d$x, d$y, "crs"), "`data` must be")
+  expect_warning(dea_rts_test(method = "bootstrap", d$x, d$y, orientation = "out", B = 5,
                               seed = 1, progress = FALSE), "resolution")
 
   ## "drs" is Benchmarking's spelling of sum(lambda) <= 1 and must select the
   ## same technology that "nirs" does, not raise an error.
-  a <- suppressWarnings(dea_rts_test(d$x, d$y, h0 = "nirs", B = 2, seed = 1, progress = FALSE))
-  b <- suppressWarnings(dea_rts_test(d$x, d$y, h0 = "DRS",  B = 2, seed = 1, progress = FALSE))
+  a <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, h0 = "nirs", B = 2, seed = 1, progress = FALSE))
+  b <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, h0 = "DRS",  B = 2, seed = 1, progress = FALSE))
   expect_equal(a$statistic, b$statistic)
   expect_equal(b$h0, "nirs")
 })
 
 test_that("the simultaneous level is Sidak and the print methods run", {
   d <- toy(30, 2, 1, 9, returns = 0.7)
-  r <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 39,
+  r <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, orientation = "out", B = 39,
                                      alpha = 0.05, seed = 1, progress = FALSE))
   expect_equal(r$alpha_individual, 1 - (1 - 0.05)^(1 / 30))
   expect_equal(r$table$scale_efficient, r$table$p_value > r$alpha_individual)
@@ -159,13 +159,13 @@ test_that("scaling the columns leaves the test alone", {
   ## Radial efficiency is units invariant, so the statistic must be too --
   ## including when the caller turns the internal rescaling off.
   d <- toy(30, 2, 1, 12, returns = 0.75)
-  a <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 9,
+  a <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, orientation = "out", B = 9,
                                      seed = 3, progress = FALSE, scaling = TRUE))
-  b <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 9,
+  b <- suppressWarnings(dea_rts_test(method = "bootstrap", d$x, d$y, orientation = "out", B = 9,
                                      seed = 3, progress = FALSE, scaling = FALSE))
   expect_equal(a$statistic, b$statistic, tolerance = 1e-9)
   x2 <- d$x; x2[, 1] <- x2[, 1] * 1000
-  c3 <- suppressWarnings(dea_rts_test(x2, d$y, orientation = "out", B = 9,
+  c3 <- suppressWarnings(dea_rts_test(method = "bootstrap", x2, d$y, orientation = "out", B = 9,
                                       seed = 3, progress = FALSE))
   expect_equal(a$statistic, c3$statistic, tolerance = 1e-9)
 })
@@ -177,7 +177,8 @@ test_that("scaling the columns leaves the test alone", {
 test_that("subsampling leaves the observed statistic alone and is a valid test", {
   d <- toy(40, 2, 1, 21, returns = 0.8)
   a <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 39,
-                                     seed = 2, progress = FALSE))
+                                     method = "bootstrap", seed = 2,
+                                     progress = FALSE))
   b <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 39,
                                      method = "subsample", m = 15, seed = 2,
                                      progress = FALSE))
@@ -253,7 +254,7 @@ test_that("subsampling arguments are validated", {
   f <- function(...) dea_rts_test(d$x, d$y, orientation = "out", B = 200,
                                   progress = FALSE, ...)
   expect_error(f(method = "jackknife"), "method")
-  expect_error(f(m = 10), "only to method")
+  expect_error(f(method = "bootstrap", m = 10), "only to method")
   expect_error(f(method = "subsample", m = 2), "3 <= m < n")
   expect_error(f(method = "subsample", m = 30), "3 <= m < n")
   expect_error(f(method = "subsample", m = NA_real_), "3 <= m < n")
@@ -272,4 +273,22 @@ test_that("subsampling rejects a far-from-cone technology and not a cone", {
                                                  progress = FALSE))
   expect_gt(f(cone)$p_value[["mean_of_ratios"]], 0.05)
   expect_lt(f(drs)$p_value[["mean_of_ratios"]], 0.05)
+})
+
+test_that("subsampling is the default, and a tiny sample says what to do", {
+  ## The default changed in 1.0.3, from the bootstrap: in more dimensions the
+  ## bootstrap's mean of ratios rejects a true null up to 25% of the time.
+  expect_identical(eval(formals(dea_rts_test)$method)[1], "subsample")
+  d <- toy(30, 2, 1, 25, returns = 0.8)
+  a <- suppressWarnings(dea_rts_test(d$x, d$y, orientation = "out", B = 39,
+                                     m = 12, seed = 1, progress = FALSE))
+  expect_identical(a$method, "subsample")
+  ## Below n = 8 subsampling cannot choose m; the error names both ways out.
+  e <- toy(7, 1, 1, 26)
+  expect_error(suppressWarnings(dea_rts_test(e$x, e$y, orientation = "out", B = 39,
+                                             progress = FALSE)),
+               "pass `m` directly. Or use method = \"bootstrap\"")
+  expect_no_error(suppressWarnings(dea_rts_test(e$x, e$y, orientation = "out",
+                                                B = 39, method = "bootstrap",
+                                                progress = FALSE)))
 })

@@ -1,5 +1,30 @@
 # DEA 1.0.3
 
+## Behaviour change: `dea_rts_test()` now subsamples by default
+
+`dea_rts_test()` now uses `method = "subsample"` unless told otherwise. It used
+to run the 2002 bootstrap. The reason is size: under a true null the bootstrap's
+mean-of-ratios test rejects **24.5%** of the time at p = 3, q = 2 (nominal 5%),
+and `rDEA` does the same, while subsampling stayed at or below nominal in every
+design measured. Details are below.
+
+**What changes for existing code:**
+
+- **P-values differ.** The observed statistics are unchanged.
+- **No per-DMU tests by default.** Under subsampling, `table$p_value` and
+  `table$scale_efficient` are `NA`, because a DMU appears in only m/n of the
+  subsamples.
+- **Very small samples.** Below n = 8, *m* cannot be chosen, so the call stops
+  and says to pass `m` or use `method = "bootstrap"`.
+- **To get the old behaviour,** pass `method = "bootstrap"`. With one output,
+  p + q = 3 and a few hundred DMUs, the bootstrap's mean of ratios is still the
+  more powerful test and its size holds.
+
+The vignette's example also ran on the wrong data. It tested `charnes1981`
+(5 inputs, 3 outputs), where the old default rejected, while the text described
+the simulated sample and said it did not reject. It now runs on the simulated
+sample, and the text matches the output.
+
 ## `dea_rts_test(method = "subsample")`: the m out of n test
 
 Simar and Wilson (2011) show that the 2002 full-sample bootstrap behind
@@ -26,8 +51,8 @@ The ratio of means gains 0.245, 0.590 and 0.445 (*t* = 8.0, 16.6, 12.6), so its
 weakness under the bootstrap was in the null distribution, not in the statistic.
 The mean of ratios gains 0.080 at n = 60, r = 0.8, nothing at r = 0.6, and loses
 0.060 at n = 200, r = 0.8 (*t* = −3.3). Subsampling is also more conservative,
-with no rejections at all under a true cone at n = 200. So the bootstrap stays the
-default -- but see the next paragraph before reading its mean of ratios.
+with no rejections at all under a true cone at n = 200. On this design alone the
+bootstrap would have stayed the default; the next paragraph is why it did not.
 
 **The bootstrap's mean of ratios over-rejects in more dimensions.** Under a true
 cone at n = 200 it rejects 2.0% of the time at p = 2, q = 1, but **9.0% at
@@ -35,8 +60,8 @@ p = 2, q = 2 and 24.5% at p = 3, q = 2**, at a nominal 5%. `rDEA::rts.test`
 rejects 25.0% on the same datasets, so this is the 2002 procedure, not this
 implementation. Subsampling held its size in all three designs (0.005, 0.040,
 0.035). `?dea_rts_test` used to recommend the bootstrap's mean of ratios without
-qualification. It now has a "Size in more dimensions" section and recommends
-`method = "subsample"` with more than one output or p + q > 3.
+qualification. It now has a "Size in more dimensions" section, and subsampling
+is the default (see the top of this release).
 
 Why subsampling is conservative is measured too, and the answer is the rate,
 not the choice of *m*. At fixed *m* the size is at most 0.010, and power falls as
