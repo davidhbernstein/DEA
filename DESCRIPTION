@@ -1,6 +1,6 @@
 Package: DEA
-Version: 1.0.3
-Date: 2026-09-28
+Version: 1.1.0
+Date: 2026-11-06
 Title: Data Envelopment Analysis
 Type: Package
 Authors@R: c(person("David", "Bernstein",
@@ -12,20 +12,27 @@ Maintainer: David Bernstein <davebernstein1@gmail.com>
 Description: Nonparametric efficiency measurement by data envelopment analysis.
     Provides radial (Charnes-Cooper-Rhodes and Banker-Charnes-Cooper) technical
     efficiency under constant, variable, non-increasing and non-decreasing
-    returns to scale, the slacks-based measure of Tone (2001), the additive
-    model of Charnes and others (1985), and the directional distance function
-    of Chambers, Chung and Fare (1996), all through one interface and one
-    result object.  Efficiency estimates are accompanied by peers, slacks,
-    returns-to-scale classification, scale efficiency and the optimal
-    multipliers, and by bias-corrected estimates and confidence intervals from
-    the smoothed homogeneous bootstrap of Simar and Wilson (1998), which also
-    supplies a test of constant returns to scale for the sample as a whole
-    (Simar and Wilson, 2002).  Where
-    prices are known, cost, revenue and Nerlovian profit efficiency separate
-    the technical component from the allocative one; where they are not,
-    cross-efficiency with the secondary goals of Doyle and Green (1994) ranks
-    units that a self-appraisal leaves tied.  This package succeeds the
-    archived 'DEA' package of Diaz-Martinez and Fernandez-Menendez (2008).
+    returns to scale and free disposal, the slacks-based measure of Tone (2001),
+    the additive model of Charnes and others (1985), the directional distance
+    function of Chambers, Chung and Fare (1996) and the multiplicative model,
+    all through one interface and one result object.  Efficiency estimates are
+    accompanied by peers, slacks, returns-to-scale classification, scale
+    efficiency and the optimal multipliers, which can be restricted by
+    assurance regions and cone ratios.  Non-discretionary and categorical
+    variables, undesirable outputs under weak disposability, and panel data
+    with the Malmquist productivity index are supported.  For inference,
+    bias-corrected estimates and confidence intervals come from the smoothed
+    homogeneous bootstrap of Simar and Wilson (1998) or from m out of n
+    subsampling (Simar and Wilson, 2011), which also supplies a test of
+    constant returns to scale for the sample as a whole, and the two-stage
+    regression of Simar and Wilson (2007) relates efficiency to environmental
+    variables.  Where prices are known, cost, revenue and Nerlovian profit
+    efficiency separate the technical component from the allocative one; where
+    they are not, cross-efficiency with the secondary goals of Doyle and Green
+    (1994) ranks units that a self-appraisal leaves tied.  A simulator with
+    closed-form true efficiencies lets every estimator be checked against the
+    truth.  This package succeeds the archived 'DEA' package of
+    Diaz-Martinez and Fernandez-Menendez (2008).
 Suggests: knitr, rmarkdown, testthat (>= 3.0.0), parallel, grDevices
 Imports: lpSolveAPI, stats, graphics, utils
 Depends: R (>= 4.0.0)

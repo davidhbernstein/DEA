@@ -1,4 +1,54 @@
-# DEA 1.0.3
+# DEA 1.1.0
+
+The first update on CRAN since 1.0.0 (September 2026). It collects the
+development versions 1.0.1 to 1.0.3, none of which went to CRAN; their detailed
+entries follow this summary, newest first.
+
+## Behaviour change
+
+* **`dea_rts_test()` now uses m out of n subsampling by default.** Under a true
+  null, the 2002 bootstrap's mean-of-ratios test rejects 24.5% of the time with
+  three inputs and two outputs, at a nominal 5%, and `rDEA` does the same.
+  Subsampling stayed at or below nominal in every design measured.
+  `method = "bootstrap"` restores the old behaviour. See "Behaviour change"
+  under 1.0.3 below for exactly what changes for existing code.
+
+## New functions
+
+* **Inference:** `dea_rts_test()`, the test of returns to scale for the sample as
+  a whole (Simar and Wilson 2002, 2011); `dea_subsample()`, m out of n
+  subsampling intervals (Simar and Wilson 2011); and `dea_reg()`, the two-stage
+  efficiency regression of Simar and Wilson (2007).
+* **Panel data:** `dea_panel()`, and the Malmquist productivity index
+  `dea_malmquist()`.
+* **Weight restrictions:** `dea_wr()` and `dea_cone()`, with the constructors
+  `wr_bound()`, `wr_ratio()` and `wr_linear()`.
+* **Environments and bad outputs:** `dea_nd()` (non-discretionary variables),
+  `dea_categorical()`, `dea_undesirable()` and `dea_weak()` (weak
+  disposability).
+* **A new model:** `dea_mult()`, the multiplicative (piecewise Cobb-Douglas)
+  model.
+* **The directional distance function** gains the range direction
+  (`direction = "range"`).
+
+## Reliability
+
+* **Numerical failures are recovered:** reused, fresh, rescaled and finally
+  primal-simplex solves, in every sweep. Any unsolved DMU is reported, never
+  returned as a silent `NA`. On a self-referenced fit, a false "infeasible"
+  from the solver is retried.
+* **`dea_cross()` no longer loses raters** to solver failures in its secondary
+  program.
+* **`plot()` has a method for every result class.**
+
+## Documentation
+
+* **Measured size, power and coverage** are reported for the bootstrap, the
+  returns-to-scale test and subsampling, including the designs where they fail.
+  `?dea_rts_test`, `?dea_boot` and `?dea_subsample` say where each can and
+  cannot be trusted.
+
+# DEA 1.0.3 (development version, not released to CRAN)
 
 ## Behaviour change: `dea_rts_test()` now subsamples by default
 
@@ -1060,7 +1110,7 @@ Found by measuring test coverage rather than by guesswork: the methods were
 most of what the suite never reached. Coverage 88% to **93%**, with `R/rts.R`
 and `R/sim.R` going from 66% and 82% to complete.
 
-# DEA 1.0.2
+# DEA 1.0.2 (development version, not released to CRAN)
 
 Two silent defects in the radial path, both in how solver failures were
 handled. No interface changes.
@@ -1101,7 +1151,7 @@ enough that the rebuild costs little, and none of the tested designs — up to
 n = 1200 across five technologies and both orientations — now leaves any DMU
 unsolved.
 
-# DEA 1.0.1
+# DEA 1.0.1 (development version, not released to CRAN)
 
 Documentation and testing only. **No user-visible behaviour changes**: every
 function returns exactly what it returned in 1.0.0.
