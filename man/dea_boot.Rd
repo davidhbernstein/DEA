@@ -195,6 +195,14 @@ is the best of the four implementations raced; the interior coverage is not.
 Read a single averaged coverage number for this or any other implementation
 with that in mind.
 
+\strong{More inputs and outputs.} Interior coverage falls fast with the
+dimension. At n = 200, output-oriented variable returns, it was 0.891 with two
+inputs and one output, 0.713 with two and two, and 0.501 with three and two,
+against a nominal 0.95 (100 replications each). \code{\link{dea_subsample}}
+covered 0.943 / 0.912 / 0.850 on the same fits; see its section
+"In more dimensions". With more than one output, or p + q above 3, prefer it
+for interior DMUs.
+
 \strong{Choosing \code{B}.} 2000 is the usual recommendation. Interval
 endpoints are sample quantiles, so a small \code{B} interpolates the tails from
 few order statistics, and going from 200 to 2000 is worth about +0.008 in

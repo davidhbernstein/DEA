@@ -128,6 +128,23 @@ Its `\tab` separators had become literal TAB characters followed by `ab`, so
 the table read `ab 0.025 ab 0.000 ...`. Fixed; that was the only file affected.
 The bug was never on CRAN: it came in after 1.0.0.
 
+## Interval coverage in more dimensions: the bootstrap's interior collapses
+
+`?dea_subsample` (new section "In more dimensions") and `?dea_boot` now report
+coverage beyond the p = 2, q = 1 design. At n = 200, vrs, output, returns 0.9,
+100 replications per design, nominal 95%:
+
+| interior coverage | p2 q1 | p2 q2 | p3 q2 |
+|---|---|---|---|
+| `dea_boot()` | 0.891 | 0.713 | **0.501** |
+| `dea_subsample()` | 0.943 | 0.912 | 0.850 |
+| paired gain (se) | +0.052 (0.005) | +0.199 (0.007) | +0.349 (0.010) |
+
+The p2 q1 row is a control on fresh seeds and reproduces the earlier figures.
+Subsampling's advantage grows with the dimension, but neither method reaches
+nominal at p + q of 4 or 5. Counting an `NA` interval as a miss, subsampling
+still does not help frontier DMUs in any design. No code changed.
+
 ## Subsampling intervals: the m out of n bootstrap
 
 `dea_subsample()` (Simar and Wilson 2011). `dea_boot()` resamples all *n*

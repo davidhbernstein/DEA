@@ -137,6 +137,30 @@ concentrates. If the units of interest are the ones the fit calls efficient,
 this method has nothing to offer them and the smaller \eqn{m} the selection
 prefers makes it worse.
 }
+\section{In more dimensions}{
+The table above is one design, two inputs and one output. Repeated at
+\eqn{n=200}, returns 0.9, with the baseline rerun on fresh seeds as a control
+(100 replications per design, \code{B = 200}, nominal 95\%):
+\tabular{lrrrrr}{
+ \tab boot, interior \tab subsample, interior \tab paired gain (se) \tab boot width \tab subsample width \cr
+\eqn{p=2, q=1} \tab 0.891 \tab 0.943 \tab +0.052 (0.005) \tab 0.089 \tab 0.094 \cr
+\eqn{p=2, q=2} \tab 0.713 \tab 0.912 \tab +0.199 (0.007) \tab 0.136 \tab 0.196 \cr
+\eqn{p=3, q=2} \tab \strong{0.501} \tab 0.850 \tab +0.349 (0.010) \tab 0.170 \tab 0.237
+}
+The control reproduces the baseline to within its Monte Carlo error. Past it,
+\strong{the bootstrap's interior coverage collapses with the dimension}, to
+about one half at \eqn{p + q = 5}, and subsampling's falls much more slowly. So
+the recommendation above gets stronger as the dimension grows, but it is not a
+cure: neither method reaches nominal at \eqn{p + q} of 4 or 5. Subsampling's
+intervals are wider, and they need to be.
+
+Counting an \code{NA} interval as a miss lowers subsampling's overall coverage
+to 0.911 / 0.888 / 0.811. About 12--14\% of frontier DMUs get \code{NA}, against
+under 1\% of interior ones. On the frontier, with \code{NA} counted as a miss,
+subsampling covers 0.68 / 0.83 / 0.74 against the bootstrap's 0.71 / 0.83 / 0.82,
+so the statement above that it does not help the frontier holds in every
+dimension measured.
+}
 \references{
 Jeong, S.-O. and Simar, L. (2006). Linearly interpolated FDH estimators of
 multivariate efficiency scores. \emph{Journal of Multivariate Analysis} 97,

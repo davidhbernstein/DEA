@@ -27,14 +27,18 @@ parametric half of the same problem.
 
 ## Installation
 
-Not yet on CRAN — a first submission is pending. From GitHub:
+From CRAN:
+
+```r
+install.packages("DEA")
+```
+
+The development version, which may be ahead of CRAN, from GitHub:
 
 ```r
 # install.packages("remotes")
 remotes::install_github("davidhbernstein/DEA")
 ```
-
-Once it is accepted, `install.packages("DEA")`.
 
 ## Quick start
 
