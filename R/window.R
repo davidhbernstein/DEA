@@ -115,15 +115,38 @@ dea_window <- function(x, y = NULL, id = NULL, period = NULL, data = NULL,
 ## Per-DMU stability across windows, which is what the method is for. Computed
 ## from the long table rather than carried alongside it, so there is one
 ## definition of it and print(), summary() and the user all see the same one.
+##
+## TWO RANGES, AND ONLY ONE OF THEM IS ABOUT THE WINDOWS. `range` is the
+## spread of every score the DMU received, over all its periods, windows and
+## widths -- the window literature's "total range". It includes the DMU's
+## genuine change from one period to the next, so a unit that improved steadily
+## has a large one under a perfectly stable technology. `ldr`, the largest
+## difference between scores of the SAME DMU-period in different windows of the
+## SAME width, holds the observation fixed and moves only the window, so it is
+## the part that measures the technology's instability. The first version of
+## summary() reported `range` alone as "range across windows", which read the
+## first as the second; a paper illustration built on it reported a number
+## that meant nothing.
 .window_stability <- function(tab) {
   key <- factor(tab$id, levels = unique(tab$id))
   f <- function(fun) vapply(split(tab$eff, key), function(v) {
     v <- v[is.finite(v)]
     if (length(v)) fun(v) else NA_real_
   }, numeric(1))
+  ## Range of each (width, DMU, period) cell, then the largest per DMU.
+  ok <- is.finite(tab$eff)
+  cell <- interaction(tab$width[ok], tab$id[ok], tab$period[ok], drop = TRUE,
+                      lex.order = TRUE)
+  cr <- vapply(split(tab$eff[ok], cell), function(v) max(v) - min(v),
+               numeric(1))
+  cid <- vapply(split(as.character(tab$id[ok]), cell), `[`, character(1), 1L)
+  ldr <- vapply(levels(key), function(k) {
+    v <- cr[cid == k]
+    if (length(v)) max(v) else NA_real_
+  }, numeric(1))
   data.frame(id = levels(key), n = as.integer(table(key)),
              mean = f(mean), min = f(min), max = f(max),
-             range = f(max) - f(min), row.names = NULL,
+             range = f(max) - f(min), ldr = unname(ldr), row.names = NULL,
              stringsAsFactors = FALSE)
 }
 
@@ -164,16 +187,17 @@ summary.dea_window <- function(object, ...) {
   cat("\nstability across windows, by DMU (first ", min(10L, nrow(st)), " of ",
       nrow(st), ")\n", sep = "")
   pr <- st
-  for (cl in c("mean", "min", "max", "range")) pr[[cl]] <- round(pr[[cl]], 4)
+  for (cl in c("mean", "min", "max", "range", "ldr")) pr[[cl]] <- round(pr[[cl]], 4)
   print(utils::head(pr, 10))
-  v <- st$range[is.finite(st$range)]
+  v <- st$ldr[is.finite(st$ldr)]
   if (length(v)) {
-    cat("\nrange across windows: median ", format(round(stats::median(v), 4)),
-        ", max ", format(round(max(v), 4)), " (DMU ",
-        st$id[which.max(st$range)], ")\n", sep = "")
-    cat("A DMU whose range is large is not being measured by a stable ",
+    cat("\nsame DMU-period, different windows (ldr): median ",
+        format(round(stats::median(v), 4)), ", max ", format(round(max(v), 4)),
+        " (DMU ", st$id[which.max(st$ldr)], ")\n", sep = "")
+    cat("A DMU whose ldr is large is not being measured by a stable ",
         "technology;\nits score depends on which periods the window happens ",
-        "to contain.\n", sep = "")
+        "to contain. `range`\nalso includes its change between periods, ",
+        "which is not instability.\n", sep = "")
   }
   invisible(object)
 }

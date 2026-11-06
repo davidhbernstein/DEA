@@ -24,6 +24,9 @@ entries follow this summary, newest first.
   of periods pooled into one technology, which is what a panel too short to
   discriminate period by period needs. Its `width` takes a vector, because no
   theory picks the width and the standard advice is to try two or three.
+  `summary()` reports, per DMU, both the largest difference between scores of
+  the same DMU-period in different windows (`ldr`, the window's own
+  instability) and the total `range`, which also includes change over time.
 * **Robustness to a single observation:** `dea_ladder()`, the efficiency
   ladder. It drops the peer a DMU's score leans on hardest, re-scores against
   what is left, and repeats, so a score that rests on one reference unit is

@@ -38,18 +38,24 @@ An object of class \code{"dea_window"}. Its \code{table} has one row per
 (width, window, DMU-period) with columns \code{width}, \code{window},
 \code{win_from}, \code{win_to}, \code{id}, \code{period}, \code{eff} and
 \code{status}; \code{panel} is the panel it was built on. \code{print()} gives
-the mean score by window, \code{summary()} the per-DMU mean and range across
-windows, and \code{plot()} the mean score by window, one line per width.
+the mean score by window, \code{summary()} the per-DMU mean, \code{range}
+and \code{ldr} (see Details), and \code{plot()} the mean score by window, one line per width.
 }
 \details{
 \strong{The output is a spread, not a score.} A DMU-period in the interior of
 the panel appears in up to \eqn{w} windows and therefore receives up to
 \eqn{w} different scores, because each window's technology is estimated from a
 different set of points. Reading any one of them as \dQuote{the} score throws
-away what the method produces. The per-DMU \code{range} that \code{summary()}
-reports is the result: a DMU with a small range is being measured by a stable
-technology, and one with a large range has a score that depends on which
-periods its window happens to contain.
+away what the method produces. \code{summary()} reports two spreads per DMU,
+and only one of them is about the windows. \code{ldr} is the largest
+difference between scores of the \emph{same} DMU-period in different windows
+of the same width: the observation is held fixed and only the window moves, so
+a DMU with a small \code{ldr} is being measured by a stable technology and one
+with a large \code{ldr} has a score that depends on which periods its window
+happens to contain. \code{range} is the spread of every score the DMU
+received, over all its periods, windows and widths; it also includes the DMU's
+genuine change between periods, so it can be large under a perfectly stable
+technology.
 
 \strong{Why the pooling is the point.} DEA discriminates badly when the sample
 is small relative to \eqn{p + q} --- the usual heuristic is

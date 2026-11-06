@@ -92,6 +92,35 @@ test_that("a DMU-period in the interior gets one score per window it is in", {
   expect_gt(max(st$range), 0)
 })
 
+test_that("ldr moves only the window, and range also moves the period", {
+  ## `ldr` holds the DMU-period fixed and compares windows of one width;
+  ## `range` pools over periods too, so it includes genuine change over time.
+  ## Pinned by hand for one DMU, because the two were once conflated.
+  f <- window_fixture(n = 10, t = 4)
+  w <- dea_window(f$x, f$y, f$id, f$period, width = 3)
+  st <- DEA:::.window_stability(w$table)
+  tb <- w$table[w$table$id == 1, ]
+  by_period <- tapply(tb$eff, tb$period, function(v) max(v) - min(v))
+  expect_equal(st$ldr[st$id == "1"], max(by_period))
+  expect_equal(st$range[st$id == "1"], max(tb$eff) - min(tb$eff))
+  expect_true(all(st$ldr <= st$range + 1e-12))
+  expect_gt(max(st$ldr), 0)
+
+  ## One window per width means every DMU-period is scored once: no window
+  ## variation exists, so ldr is exactly zero while range need not be.
+  w1 <- dea_window(f$x, f$y, f$id, f$period, width = 4)
+  st1 <- DEA:::.window_stability(w1$table)
+  expect_equal(st1$ldr, rep(0, nrow(st1)))
+  expect_gt(max(st1$range), 0)
+
+  ## Two widths: a DMU-period's width-2 and width-3 scores are not compared
+  ## with each other. With width 4 added to width 2, ldr equals width 2's.
+  w24 <- dea_window(f$x, f$y, f$id, f$period, width = c(2, 4))
+  w2 <- dea_window(f$x, f$y, f$id, f$period, width = 2)
+  expect_equal(DEA:::.window_stability(w24$table)$ldr,
+               DEA:::.window_stability(w2$table)$ldr)
+})
+
 test_that("an unbalanced panel is an ordinary case", {
   f <- window_fixture(n = 8, t = 3)
   keep <- !(f$id == 1 & f$period == 2)
