@@ -80,6 +80,16 @@ are.
 multiple optima, so \code{peers()} reports one valid benchmark set rather than
 the benchmark set. Efficiency scores are unique; the weights achieving them
 generally are not.
+
+\strong{\code{summary()} names the efficient DMUs that envelop no one.} An
+efficient DMU that appears in no other DMU's reference set is efficient by
+default rather than by comparison: nothing in the sample is benchmarked against
+it, so nothing in the sample resembles it, and a mistyped value in it would
+show up in no other DMU's score. This is the cheap half of DEA's sensitivity to
+a single observation --- see \code{\link{dea_ladder}} for the other half, how
+much an inefficient DMU's score rests on any one of the units that do envelop
+it. Note that \dQuote{its own optimal \eqn{\lambda} is \eqn{e_o}} would be a
+different and empty statement: that is true of every efficient DMU.
 }
 \section{The multiplier form}{
 \code{multipliers()} returns one row per DMU: the weights \eqn{v} on the

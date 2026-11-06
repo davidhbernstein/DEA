@@ -20,7 +20,9 @@ Description: Nonparametric efficiency measurement by data envelopment analysis.
     efficiency and the optimal multipliers, which can be restricted by
     assurance regions and cone ratios.  Non-discretionary and categorical
     variables, undesirable outputs under weak disposability, and panel data
-    with the Malmquist productivity index are supported.  For inference,
+    with the Malmquist productivity index and window analysis are supported.
+    Because a single observation can move the frontier, an efficiency ladder
+    reports how much of a score rests on any one peer.  For inference,
     bias-corrected estimates and confidence intervals come from the smoothed
     homogeneous bootstrap of Simar and Wilson (1998) or from m out of n
     subsampling (Simar and Wilson, 2011), which also supplies a test of

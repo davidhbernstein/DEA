@@ -19,8 +19,18 @@ entries follow this summary, newest first.
   a whole (Simar and Wilson 2002, 2011); `dea_subsample()`, m out of n
   subsampling intervals (Simar and Wilson 2011); and `dea_reg()`, the two-stage
   efficiency regression of Simar and Wilson (2007).
-* **Panel data:** `dea_panel()`, and the Malmquist productivity index
-  `dea_malmquist()`.
+* **Panel data:** `dea_panel()`, the Malmquist productivity index
+  `dea_malmquist()`, and `dea_window()` for window analysis -- a rolling block
+  of periods pooled into one technology, which is what a panel too short to
+  discriminate period by period needs. Its `width` takes a vector, because no
+  theory picks the width and the standard advice is to try two or three.
+* **Robustness to a single observation:** `dea_ladder()`, the efficiency
+  ladder. It drops the peer a DMU's score leans on hardest, re-scores against
+  what is left, and repeats, so a score that rests on one reference unit is
+  visible as such. `summary()` on a fit now also names the efficient DMUs that
+  appear in **no other DMU's reference set** -- units nothing in the sample is
+  benchmarked against, efficient by default rather than by comparison, and in
+  which a mistyped value would show up in no other score.
 * **Weight restrictions:** `dea_wr()` and `dea_cone()`, with the constructors
   `wr_bound()`, `wr_ratio()` and `wr_linear()`.
 * **Environments and bad outputs:** `dea_nd()` (non-discretionary variables),

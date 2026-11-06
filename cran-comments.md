@@ -2,12 +2,13 @@
 
 This is an update of `DEA` from 1.0.0, on CRAN since September 2026, to 1.1.0.
 
-It adds fifteen exported functions, listed in `NEWS.md`. The main ones are
+It adds seventeen exported functions, listed in `NEWS.md`. The main ones are
 inference (a test of returns to scale, m out of n subsampling intervals, a
-two-stage efficiency regression), panel data with the Malmquist index, weight
-restrictions, and models for environmental, categorical and undesirable
-variables. It also hardens the linear-programming layer against numerical
-failures that previously left estimates silently missing.
+two-stage efficiency regression), panel data with the Malmquist index and
+window analysis, weight restrictions, models for environmental, categorical and
+undesirable variables, and an efficiency ladder reporting how much of a score
+rests on any one peer. It also hardens the linear-programming layer against
+numerical failures that previously left estimates silently missing.
 
 **One behaviour change:** `dea_rts_test()`, which is new since 1.0.0, now uses
 subsampling by default rather than the bootstrap. It did not exist in the CRAN
@@ -31,12 +32,14 @@ win-builder (R-devel) has not been run for this version yet.
 
 ## R CMD check results
 
-0 errors | 0 warnings | 2 notes, both from the local machine rather than the
+0 errors | 0 warnings | 1-2 notes, from the local machine rather than the
 package:
 
-* "checking for future file timestamps ... unable to verify current time":
-  the time server could not be reached.
 * "checking HTML version of manual": the local HTML Tidy is too old to run.
+  Always present here.
+* "checking for future file timestamps ... unable to verify current time":
+  only when the time server cannot be reached, so it comes and goes between
+  runs on the same sources.
 
 ## Reverse dependencies
 

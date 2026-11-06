@@ -4,6 +4,7 @@ export(dea, dea_sbm, dea_ddf, dea_add, dea_rts, dea_rts_test, dea_boot,
        dea_mult, dea_categorical, dea_nd, dea_weak, dea_subsample,
        wr_bound, wr_ratio, wr_linear,
        dea_cost, dea_revenue, dea_profit, dea_cross,
+       dea_ladder, dea_window,
        efficiency, peers, slacks, multipliers)
 
 import("lpSolveAPI")
@@ -76,6 +77,14 @@ S3method(print,   dea_malmquist)
 S3method(summary, dea_malmquist)
 S3method(nobs,    dea_malmquist)
 
+S3method(print,   dea_window)
+S3method(summary, dea_window)
+S3method(nobs,    dea_window)
+
+S3method(print,   dea_ladder)
+S3method(summary, dea_ladder)
+S3method(nobs,    dea_ladder)
+
 S3method(print,   dea_rts)
 S3method(summary, dea_rts)
 S3method(print,   dea_rts_test)
@@ -92,3 +101,5 @@ S3method(plot,    dea_rts)
 S3method(plot,    dea_cross)
 S3method(plot,    dea_price)
 S3method(plot,    dea_sim)
+S3method(plot,    dea_window)
+S3method(plot,    dea_ladder)

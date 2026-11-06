@@ -38,6 +38,17 @@ Over time, on a long-format panel:
   \item{\code{\link{dea_malmquist}}}{the Malmquist productivity index of
   Fare, Grosskopf, Norris and Zhang (1994), split into efficiency change and
   technical change, and efficiency change into pure and scale parts.}
+  \item{\code{\link{dea_window}}}{window analysis: a rolling block of
+  periods pooled into one technology, which is what a panel too short to
+  discriminate period by period needs.}
+}
+Because one observation can move a frontier, and the estimator has no residual
+to say so:
+\describe{
+  \item{\code{\link{dea_ladder}}}{the efficiency ladder -- drop the peer a
+  score leans on hardest, re-score, repeat.}
+  \item{\code{summary()} on a fit}{names the efficient DMUs that envelop no
+  one: units nothing in the sample is comparable to.}
 }
 When prices are known, efficiency splits into a technical part and a part that
 is about buying the wrong mix at those prices:

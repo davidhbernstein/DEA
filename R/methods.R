@@ -65,6 +65,17 @@ summary.dea <- function(object, ...) {
     cat("\nPeer sets are not unique when the linear program has multiple\n",
         "optima, which is common. Treat them as one valid benchmark set,\n",
         "not as the benchmark set.\n", sep = "")
+    own <- .dea_self_referencing(object)
+    if (any(own)) {
+      cat("\nefficient but enveloping no one: ", sum(own), " of ",
+          sum(object$efficient, na.rm = TRUE), " efficient DMU(s)\n", sep = "")
+      print(utils::head(object$dmu[own], 5))
+      cat("No other DMU is benchmarked against these, so nothing in the ",
+          "sample\nresembles them: they are efficient by default rather than ",
+          "by\ncomparison, and a mistyped value in one of them would show up ",
+          "in no\nother DMU's score. See ?dea_ladder for how much the other ",
+          "scores\ndepend on the units that DO envelop them.\n", sep = "")
+    }
   }
   invisible(object)
 }
@@ -478,6 +489,54 @@ nobs.dea_cross <- function(object, ...) object$n
              peer   = ref[idx[, 2L]],
              lambda = L[idx],
              row.names = NULL, stringsAsFactors = FALSE)
+}
+
+## ---------------------------------------------------------------------------
+## Which efficient DMUs envelop nobody: the outliers for which the sample
+## contains no comparable group.
+##
+## Chapter 21 section 6 makes the point that a DMU whose reference set is only
+## itself is an outlier for which no comparable group exists: it is on the
+## frontier because there is nothing in the sample to compare it with, and no
+## amount of data about the other units would change its score.
+##
+## THE LITERAL READING OF THAT SENTENCE IS VACUOUS, AND MEASURING IT IS WHAT
+## SHOWED IT. "The DMU's own optimal lambda is e_o" is true of EVERY efficient
+## DMU, under every technology here -- an efficient unit is its own projection.
+## The first version of this function tested exactly that and fired on 27 of
+## charnes1981's 70 DMUs, which is precisely its efficient count: a second name
+## for `efficient`, printed as if it were news.
+##
+## What is not vacuous, and is what the caveat is actually about, is the other
+## direction: an efficient DMU that appears in NO OTHER DMU's reference set.
+## Nothing in the sample is benchmarked against it, so nothing in the sample
+## resembles it. It sits in a corner of the input-output space it occupies
+## alone, it is efficient by default rather than by comparison, and if its data
+## carry a misplaced decimal point there is no neighbour whose score would
+## reveal it. That is the zero tail of the peer counts `summary()` already
+## prints, which is why the roadmap called it one line off `peers()`.
+##
+## The diagonal is therefore excluded before counting. Leaving it in would make
+## every efficient DMU its own referrer and put the count back at one for all
+## of them, which is the vacuous version again, one level down.
+##
+## It is a property of the SELF-REFERENCED, non-super fit and of no other. With
+## an external reference set the DMU is not in the set at all; under
+## super-efficiency it is excluded from its own set by construction. Both
+## return all FALSE rather than an error, because this feeds a print method.
+## An unsolved DMU is never flagged: not knowing whether it is efficient is not
+## the same as knowing it is isolated.
+## ---------------------------------------------------------------------------
+.dea_self_referencing <- function(object) {
+  L <- object$lambda
+  if (is.null(L) || !isTRUE(object$self_ref) || isTRUE(object$super))
+    return(rep(FALSE, object$n))
+  M <- L > .DEA_CONSTANTS$TOL_LAMBDA
+  M[is.na(M)] <- FALSE
+  d <- seq_len(min(dim(M)))
+  M[cbind(d, d)] <- FALSE
+  eff <- object$efficient
+  !is.na(eff) & eff & colSums(M) == 0L
 }
 
 ## ---------------------------------------------------------------------------
