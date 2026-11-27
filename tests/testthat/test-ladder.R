@@ -80,6 +80,10 @@ test_that("which peer is dropped is defined and reproducible", {
   expect_equal(dea_ladder(f, dmu = o)$table, lad$table)
   ## By name and by index are the same DMU.
   expect_equal(dea_ladder(f, dmu = f$dmu[o])$table, lad$table)
+  ## A factor is a name too. It used to go through as.integer() and audit the
+  ## DMU at its level code's row instead.
+  fac <- factor(f$dmu[o], levels = rev(f$dmu))
+  expect_identical(dea_ladder(f, dmu = fac)$index, unname(o))
 })
 
 test_that("max_steps truncates and the object reports the stopping reason", {
@@ -113,6 +117,8 @@ test_that("the ladder refuses the fits it cannot audit", {
   expect_error(dea_ladder(f, dmu = "nope"), "not one of this fit")
   expect_error(dea_ladder(f, dmu = 99), "outside 1:15")
   expect_error(dea_ladder(f, dmu = c(1, 2)), "a single DMU")
+  expect_error(dea_ladder(f, dmu = 2.5), "whole-number index")
+  expect_error(dea_ladder(f, dmu = TRUE), "whole-number index")
   expect_error(dea_ladder(f, dmu = 1, max_steps = 0), "positive")
 })
 

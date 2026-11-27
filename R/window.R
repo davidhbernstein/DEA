@@ -134,9 +134,14 @@ dea_window <- function(x, y = NULL, id = NULL, period = NULL, data = NULL,
     if (length(v)) fun(v) else NA_real_
   }, numeric(1))
   ## Range of each (width, DMU, period) cell, then the largest per DMU.
+  ## The cell key is built from integer codes, not from the labels: the
+  ## labels of interaction() are pasted with ".", so id "a.b" in period "1"
+  ## and id "a" in period "b.1" were one cell, and ldr compared scores of two
+  ## different observations -- it could even exceed the DMU's total range.
   ok <- is.finite(tab$eff)
-  cell <- interaction(tab$width[ok], tab$id[ok], tab$period[ok], drop = TRUE,
-                      lex.order = TRUE)
+  code <- function(v) match(v, unique(v))
+  cell <- factor(paste(code(tab$width[ok]), code(tab$id[ok]),
+                       code(tab$period[ok]), sep = ":"))
   cr <- vapply(split(tab$eff[ok], cell), function(v) max(v) - min(v),
                numeric(1))
   cid <- vapply(split(as.character(tab$id[ok]), cell), `[`, character(1), 1L)

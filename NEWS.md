@@ -53,6 +53,14 @@ entries follow this summary, newest first.
 * **`dea_cross()` no longer loses raters** to solver failures in its secondary
   program.
 * **`plot()` has a method for every result class.**
+* **`summary()` on a `dea_window()` result no longer merges observations
+  whose labels paste alike.** Its `ldr` grouped scores by `interaction()`
+  levels, which join with `"."`, so id `"a.b"` in period `"1"` and id `"a"` in
+  period `"b.1"` were one cell and `ldr` could exceed the DMU's total range.
+* **`dea_ladder()` audits the DMU it was asked about when `dmu` is a factor.**
+  A factor was used as a row index through its level code, silently auditing
+  another DMU; it is now matched by name. A non-whole index such as `2.5` is
+  an error instead of being truncated.
 
 ## Documentation
 
