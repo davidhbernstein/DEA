@@ -87,6 +87,18 @@ entries follow this summary, newest first.
   another DMU; it is now matched by name. A non-whole index such as `2.5` is
   an error instead of being truncated.
 
+## Performance
+
+* **`dea(multipliers = TRUE, slack = FALSE, peers = FALSE)` solves one
+  program per DMU instead of two.** Nothing in that combination needs the
+  envelopment program: the score is the multiplier program's optimal value by
+  duality, and `sum_lambda` is the sum of its dual prices. About 1.5x faster
+  at n = 120, p = 3, q = 2, and `dea_cross()`, which uses exactly this call,
+  gains the same. The two optima agree to solver tolerance (about 1e-11), not
+  exactly, so `eff` can differ in the last digits from a fit that asks for
+  peers; a test pins the agreement. Super-efficiency and free disposal keep
+  the envelopment program.
+
 ## Documentation
 
 * **Measured size, power and coverage** are reported for the bootstrap, the

@@ -55,12 +55,6 @@ dea <- function(x, y, data = NULL,
          "unimplemented.", call. = FALSE)
   }
 
-  out <- if (identical(rts, "fdh")) {
-    .dea_fdh(Xs, Ys, XRs, YRs, orientation, super, n, nr, p, q)
-  } else {
-    .dea_radial(Xs, Ys, XRs, YRs, rts, orientation, super, slack, peers, n, nr, p, q)
-  }
-
   ## The multiplier sweep is a second family of programs over the same
   ## technology, run only when asked for: it doubles the solve time and most
   ## callers want the score, not the prices that support it.
@@ -68,6 +62,38 @@ dea <- function(x, y, data = NULL,
     .dea_multipliers(Xs, Ys, XRs, YRs, rts, orientation, super, n, nr, p, q,
                      sc$sx, sc$sy, d, colnames(X), colnames(Y))
   } else NULL
+
+  ## ONE PROGRAM INSTEAD OF TWO, WHEN NOTHING NEEDS THE SECOND. With
+  ## slack = FALSE and peers = FALSE nothing is read from the envelopment
+  ## program that the multiplier program does not also give: the score is its
+  ## optimal value, by strong duality, and sum_lambda is the sum of its dual
+  ## prices on the reference rows. Solving both was the one race this package
+  ## lost to Benchmarking::dea.dual (0.044 s against 0.021 s at n = 120,
+  ## p = 3, q = 2), which solves only the dual.
+  ##
+  ## The two optima agree to solver tolerance, not exactly -- measured at
+  ## about 1e-11 over all four technologies and both orientations -- so eff
+  ## can differ in the last digits from a fit that asks for peers.
+  ## test-multipliers.R pins that agreement. Super-efficiency is excluded:
+  ## there the dual failed on far more DMUs than the envelopment program in
+  ## testing, and an infeasible envelopment program is the documented answer
+  ## that only the envelopment status reports cleanly.
+  dual_only <- multipliers && !slack && !peers && !super &&
+               !identical(rts, "fdh")
+
+  out <- if (dual_only) {
+    ## `status` describes the envelopment program, as documented. Its dual is
+    ## UNBOUNDED (3) exactly when it is infeasible (2), which only an external
+    ## reference set can produce here.
+    est <- mult$status
+    est[est == 3L] <- 2L
+    list(eff = mult$eff, lambda = NULL, sx = NULL, sy = NULL,
+         status = est, sum_lambda = mult$sum_lambda)
+  } else if (identical(rts, "fdh")) {
+    .dea_fdh(Xs, Ys, XRs, YRs, orientation, super, n, nr, p, q)
+  } else {
+    .dea_radial(Xs, Ys, XRs, YRs, rts, orientation, super, slack, peers, n, nr, p, q)
+  }
 
   ## Snap to the boundary. A simplex solver returns 0.9999999998 where the
   ## answer is exactly 1, and leaving that in makes every downstream "is this
@@ -94,7 +120,9 @@ dea <- function(x, y, data = NULL,
   ## a dual that failed returned NA weights while `status` -- which describes
   ## the ENVELOPMENT program -- kept saying 0. Same silent hole that
   ## .dea_radial()'s stage two had.
-  if (!is.null(mult)) {
+  ## On the dual-only path the score IS the multiplier program, so its
+  ## failures were already reported above as unsolved DMUs.
+  if (!is.null(mult) && !dual_only) {
     .dea_report_mult_unsolved(mult$status, out$status, n, super)
   }
 
@@ -256,6 +284,7 @@ dea <- function(x, y, data = NULL,
   U  <- matrix(NA_real_, n, q)
   u0 <- rep(NA_real_, n)
   st <- integer(n)
+  ef <- sl <- rep(NA_real_, n)
   for (o in seq_len(n)) {
     r <- .lp_mult_at(M, Xs, Ys, o, exclude = if (super) o else NULL)
     ## RETRY ON A FRESH LP, for the same reason stage two of .dea_radial()
@@ -290,13 +319,15 @@ dea <- function(x, y, data = NULL,
       }
     }
     V[o, ] <- r$v; U[o, ] <- r$u; u0[o] <- r$u0; st[o] <- r$status
+    ef[o] <- r$eff; sl[o] <- r$sum_lambda
   }
   V <- sweep(V, 2L, sx, "/")
   U <- sweep(U, 2L, sy, "/")
   dimnames(V) <- list(d$dmu, xnames)
   dimnames(U) <- list(d$dmu, ynames)
   names(u0) <- d$dmu
-  list(v = V, u = U, u0 = if (M$has0) u0 else NULL, status = st)
+  list(v = V, u = U, u0 = if (M$has0) u0 else NULL, status = st,
+       eff = ef, sum_lambda = sl)
 }
 
 .dea_fdh <- function(Xs, Ys, XRs, YRs, orientation, super, n, nr, p, q) {
