@@ -65,6 +65,18 @@ entries follow this summary, newest first.
   `dea_ddf()` and `dea_weak()`. Names that are the variables' names in any
   order are now honoured, names that match only some of them are an error,
   and unnamed input keeps the documented positional reading.
+* **`wr_linear()` with two variables means what it says.** A length-2
+  coefficient vector whose first entry was a valid index was read as the
+  (index, coefficient) shorthand `wr_bound()` used internally, so with two
+  inputs `wr_linear(v = c(1, -2))`, meaning v1 - 2 v2 <= 0, became the vacuous
+  -2 v1 <= 0; scores moved by 0.51. `wr_bound()` now stores its term as a
+  matrix row and a plain vector is always dense coefficients.
+* **`dea_reg()` refuses a fit scored against an external reference set**, as
+  `dea_boot()` and `dea_subsample()` already did. Its bias correction builds
+  the pseudo-technology from the evaluated sample, so such a fit was corrected
+  against the wrong frontier and returned estimates without a warning. `L1`
+  and `L2` are now checked: zero once gave a misleading "failed to converge"
+  or an internal error.
 * **A formula no longer drops rows with missing values.** `x = ~ x1 + x2`
   went through `model.matrix()`'s default `na.omit`, so an `NA` in both `x`
   and `y` gave a fit with one DMU fewer and no warning, and an `NA` in one of

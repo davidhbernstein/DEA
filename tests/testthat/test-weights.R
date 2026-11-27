@@ -143,6 +143,21 @@ test_that("a restricted fit refuses to report peers or slacks", {
   expect_output(print(f), "No peers or slacks")
 })
 
+test_that("a length-2 coefficient vector is two coefficients, not a pair", {
+  ## With two inputs, wr_linear(v = c(1, -2)) means v1 - 2 v2 <= 0. It was
+  ## once read as the (index, coefficient) pair (1, -2), i.e. -2 v1 <= 0,
+  ## which binds nothing; scores moved by 0.51 between the two readings.
+  set.seed(6)
+  X <- matrix(stats::runif(60, 1, 10), 30); Y <- matrix(stats::runif(30, 1, 10), 30)
+  dense <- dea_wr(X, Y, wr_linear(v = c(1, -2)))
+  nudged <- dea_wr(X, Y, wr_linear(v = c(1 + 1e-9, -2)))
+  expect_equal(dense$eff, nudged$eff, tolerance = 1e-6)
+  expect_gt(max(abs(dense$eff - dea_wr(X, Y, wr_linear(v = c(-2, 0)))$eff)), 0.1)
+  ## wr_bound() still means what it says with two variables.
+  b <- dea_wr(X, Y, wr_bound("v", 2, lower = 0.05), rts = "crs")
+  expect_true(all(b$v[, 2] >= 0.05 - 1e-8))
+})
+
 test_that("restriction constructors validate what they are given", {
   expect_error(wr_bound("v", 1), "at least one")
   expect_error(wr_bound("v", 1, lower = 2, upper = 1), "above upper")

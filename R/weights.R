@@ -61,10 +61,10 @@ wr_bound <- function(on = c("v", "u"), index, lower = NA, upper = NA) {
             u = if (on == "u") coef else NULL, type = type, rhs = rhs,
             label = lab)
   if (!is.na(lower))
-    out <- c(out, list(side(c(index, 1), ">=", lower,
+    out <- c(out, list(side(rbind(c(index, 1)), ">=", lower,
                             sprintf("%s[%d] >= %g", on, index, lower))))
   if (!is.na(upper))
-    out <- c(out, list(side(c(index, 1), "<=", upper,
+    out <- c(out, list(side(rbind(c(index, 1)), "<=", upper,
                             sprintf("%s[%d] <= %g", on, index, upper))))
   do.call(c, out)
 }
@@ -183,11 +183,12 @@ print.dea_restriction <- function(x, ...) {
                         "are only ", n, ".", call. = FALSE)
         row[off + i] <<- row[off + i] + z[m, 2L]
       }
-    } else if (length(z) == 2L && z[1L] == as.integer(z[1L]) && z[1L] >= 1 &&
-               z[1L] <= n && !is.matrix(z)) {
-      ## the (index, coefficient) shorthand the bound/ratio constructors use
-      row[off + as.integer(z[1L])] <<- row[off + as.integer(z[1L])] + z[2L]
     } else {
+      ## A plain vector is always dense coefficients. A length-2 vector was
+      ## once ALSO read as an (index, coefficient) pair whenever its first
+      ## entry was a valid index, so with two inputs wr_linear(v = c(1, -2)),
+      ## meaning v1 - 2 v2 <= 0, became the vacuous -2 v1 <= 0. Sparse terms
+      ## are (index, coefficient) rows of a matrix, and only that.
       if (length(z) != n)
         stop("A restriction gives ", length(z), " coefficient(s) on ", what,
              " but there are ", n, ".", call. = FALSE)
