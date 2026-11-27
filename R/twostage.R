@@ -58,12 +58,29 @@ dea_reg <- function(object, z, data = NULL,
     stop("A super-efficiency score is not an estimator of a distance to the ",
          "true frontier, so there is nothing here for this procedure to ",
          "regress or to bias-correct.", call. = FALSE)
+  ## As in dea_boot() and dea_subsample(): the procedure's pseudo-technology
+  ## is built from the evaluated sample, so a score measured against some
+  ## other reference set would be bias-corrected against the wrong frontier.
+  ## This was once accepted without a word and returned estimates.
+  if (!isTRUE(object$self_ref))
+    stop("The Simar-Wilson procedure resamples the technology, so it needs a ",
+         "fit whose reference set IS the sample. This fit was scored against ",
+         "an explicit `xref`/`yref`.", call. = FALSE)
   if (identical(object$rts, "fdh"))
     stop("The pseudo-sample step assumes the convex estimator; under free ",
          "disposal the relevant resampling scheme is a different one and is ",
          "not implemented here.", call. = FALSE)
   if (!is.numeric(alpha) || length(alpha) != 1L || alpha <= 0 || alpha >= 1)
     stop("`alpha` must be one number in (0, 1).", call. = FALSE)
+  ## Checked here because a zero once reached the procedure: L2 = 0 reported
+  ## that every replication "failed to converge" when there were none, and
+  ## L1 = 0 failed inside the bias correction with no hint of the cause.
+  for (a in c("L1", "L2")) {
+    v <- get(a)
+    if (!is.numeric(v) || length(v) != 1L || !is.finite(v) || v < 2)
+      stop("`", a, "` must be a single number of replications, at least 2.",
+           call. = FALSE)
+  }
   L1 <- as.integer(L1); L2 <- as.integer(L2)
   if (!is.null(seed)) set.seed(seed)
 

@@ -521,12 +521,19 @@
   if (!is.null(exclude)) lpSolveAPI::set.rhs(lp, 0, exclude + 1L)
 
   if (!st %in% c(0L, 1L)) {
-    return(list(status = st, eff = NA_real_, v = rep(NA_real_, p),
+    return(list(status = st, eff = NA_real_, sum_lambda = NA_real_,
+                v = rep(NA_real_, p),
                 u = rep(NA_real_, q), u0 = NA_real_))
   }
   z <- lpSolveAPI::get.variables(lp)
+  ## The dual prices of the reference-set rows are the envelopment program's
+  ## lambda, by duality, so their sum is its sum_lambda. dea() reads this when
+  ## it skips the envelopment solve; see the note there. Element 1 of the dual
+  ## solution is the objective's and element 2 the normalisation row's.
+  dual <- lpSolveAPI::get.dual.solution(lp)
   list(status = st,
        eff = lpSolveAPI::get.objective(lp),
+       sum_lambda = sum(abs(dual[2L + seq_len(M$nref)])),
        v   = z[seq_len(p)],
        u   = z[p + seq_len(q)],
        ## u0 is reported in the sign the TABLE above uses, which is the sign it

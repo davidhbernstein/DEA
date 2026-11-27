@@ -158,9 +158,15 @@ test_that("dea_reg refuses fits it has no procedure for", {
                "free disposal")
   expect_error(dea_reg(dea(d$x, d$y, super = TRUE, slack = FALSE), d$z),
                "super-efficiency")
+  ## An external reference set: the pseudo-technology would be the wrong one.
+  ext <- dea(d$x, d$y, rts = "crs", slack = FALSE,
+             xref = d$x[1:30, , drop = FALSE], yref = d$y[1:30, , drop = FALSE])
+  expect_error(dea_reg(ext, d$z), "reference set IS the sample")
   fit <- dea(d$x, d$y, rts = "vrs", orientation = "out", slack = FALSE)
   expect_error(dea_reg(fit, d$z[-1, ]), "rows but the fit has")
   expect_error(dea_reg(fit, d$z, alpha = 0), "in \\(0, 1\\)")
+  expect_error(dea_reg(fit, d$z, L1 = 0), "`L1` must be")
+  expect_error(dea_reg(fit, d$z, L2 = 0), "`L2` must be")
   ## a sample with too few inefficient DMUs cannot support the regression
   eff_only <- dea(d$x, d$x, rts = "crs", slack = FALSE)
   expect_error(dea_reg(eff_only, d$z), "inefficient")

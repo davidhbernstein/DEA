@@ -15,6 +15,17 @@ test_that("x and y can be given four different ways, all equivalent", {
                unname(dea(s1$x, s1$y, rts = "vrs", slack = FALSE)$eff))
 })
 
+test_that("a formula refuses missing values rather than dropping the row", {
+  ## model.matrix()'s default na.omit once removed the row silently: an NA in
+  ## both x and y gave a fit with one DMU fewer and no warning, and an NA in x
+  ## alone failed on the row count with no mention of the NA.
+  d <- dea_sim(20, p = 1, q = 1, seed = 1)$data
+  both <- d; both$x1[3] <- NA; both$y1[3] <- NA
+  expect_error(dea(~ x1, ~ y1, data = both), "missing or non-finite")
+  xonly <- d; xonly$x1[3] <- NA
+  expect_error(dea(~ x1, ~ y1, data = xonly), "missing or non-finite")
+})
+
 test_that("row names become DMU names throughout", {
   s <- dea_sim(20, p = 1, q = 1, seed = 1)
   x <- s$x; y <- s$y

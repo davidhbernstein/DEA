@@ -66,7 +66,13 @@
       stop("`", what, "` must be a ONE-sided formula such as ~ x1 + x2.", call. = FALSE)
     }
     tt <- stats::terms(arg, data = data)
-    m  <- stats::model.matrix(tt, data = as.data.frame(data))
+    ## na.pass, not the default na.omit: model.matrix() would otherwise drop
+    ## rows with a missing value without a word, so the fit silently had fewer
+    ## DMUs (or, with the NA in x only, failed on a row count). .dea_num()
+    ## below is where missing values are refused, with the reason.
+    mf <- stats::model.frame(tt, data = as.data.frame(data),
+                             na.action = stats::na.pass)
+    m  <- stats::model.matrix(tt, data = mf)
     m  <- m[, colnames(m) != "(Intercept)", drop = FALSE]
     if (!ncol(m)) stop("`", what, "` selected no variables.", call. = FALSE)
     return(.dea_num(m, what))
@@ -288,4 +294,26 @@
             "use a measure that normalizes them.", call. = FALSE)
   }
   invisible(NULL)
+}
+
+## Line up a per-variable argument (prices, a direction) with the variables by
+## its names, when it has them. Positional order was once the only reading, and
+## names were overwritten afterwards, so c(capital = 5, labor = 1) against
+## inputs (labor, capital) silently priced labor at 5. Names that are a
+## permutation of the variables are honoured; names that match only some of
+## them are refused; names unrelated to the variables (or none) leave the
+## positional reading alone, which is what the documentation promises.
+.align_by_name <- function(M, varnames, what, label) {
+  nm <- colnames(M)
+  if (is.null(nm) || is.null(varnames) || anyDuplicated(varnames)) return(M)
+  if (setequal(nm, varnames) && !anyDuplicated(nm)) {
+    return(M[, match(varnames, nm), drop = FALSE])
+  }
+  if (length(intersect(nm, varnames))) {
+    stop("`", what, "` is named, but its names (", paste(nm, collapse = ", "),
+         ") do not match the ", label, " (", paste(varnames, collapse = ", "),
+         ") one to one. Name every entry after its variable, or pass them ",
+         "unnamed in the variables' order.", call. = FALSE)
+  }
+  M
 }

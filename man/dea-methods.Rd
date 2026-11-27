@@ -24,7 +24,7 @@ efficiency(object, \dots)
 \method{efficiency}{dea}(object, type = c("natural", "score"), \dots)
 
 peers(object, \dots)
-\method{peers}{dea}(object, threshold = 1e-08, \dots)
+\method{peers}{dea}(object, threshold = 1e-08, count = FALSE, \dots)
 
 slacks(object, \dots)
 \method{slacks}{dea}(object, \dots)
@@ -47,15 +47,24 @@ multipliers(object, \dots)
 \eqn{(0, 1]} with 1 meaning efficient, which is what a table comparing models
 needs.}
 \item{threshold}{Intensity weights at or below this are not reported as peers.}
+\item{count}{For \code{peers()}: if \code{TRUE}, return one row per reference
+DMU with the number of \emph{other} DMUs whose reference set contains it, rather
+than the long table of peers.}
 \item{ngrid}{Number of grid points used to trace the frontier in
 \code{plot()}.}
 \item{\dots}{Passed to the underlying plot, or ignored.}
 }
 \value{
 \code{efficiency} and \code{nobs} return numeric vectors; \code{peers} returns
-a data frame with columns \code{dmu}, \code{peer} and \code{lambda};
+a data frame with columns \code{dmu}, \code{peer} and \code{lambda}, or with
+\code{count = TRUE} one with columns \code{peer}, \code{referenced_by} and
+\code{share} (\code{referenced_by} over the number of DMUs), most-referenced
+first;
 \code{slacks} and \code{fitted} return matrices with one row per DMU.
 \code{print} and \code{summary} return their argument invisibly.
+\code{plot()} returns the traced frontier invisibly when there is one input and
+one output, and otherwise a list of the \code{scores} and their
+\code{density} (with its bandwidth \code{bw}).
 }
 \details{
 \code{efficiency(object, "score")} deliberately \emph{fails} for a directional
@@ -69,7 +78,13 @@ were efficient. For a radial fit with slacks that is the radial projection with
 the remaining slack removed, so the result is a Pareto-Koopmans point.
 
 \code{plot()} draws the estimated frontier when there is one input and one
-output, and the distribution of scores otherwise. The frontier is traced by
+output, and the distribution of scores otherwise: a histogram with a kernel
+density \emph{reflected at the frontier}. Scores have a hard boundary there and
+usually an atom on it, so an ordinary \code{density()} leaks probability past
+the boundary and is biased down exactly where the mass is. The reflection and
+the Silverman bandwidth are the ones \code{\link{dea_boot}} smooths with, so
+the curve is the density that procedure resamples from. Scores on both sides
+of the boundary (super-efficiency) get an ordinary density. The frontier is traced by
 \emph{evaluating} the fitted technology on a grid of input levels rather than
 by joining up the efficient DMUs, so the same code draws it correctly under
 every returns-to-scale assumption --- including the free disposal hull's
@@ -80,6 +95,12 @@ are.
 multiple optima, so \code{peers()} reports one valid benchmark set rather than
 the benchmark set. Efficiency scores are unique; the weights achieving them
 generally are not.
+
+\strong{Facet participation.} \code{peers(fit, count = TRUE)} tabulates how
+often each reference DMU appears in other DMUs' reference sets, which says
+which units are actually doing the enveloping. A DMU is not counted as its own
+referrer: every efficient DMU is its own projection, so that would add one to
+all of them and say nothing. \code{summary()} prints the top of this table.
 
 \strong{\code{summary()} names the efficient DMUs that envelop no one.} An
 efficient DMU that appears in no other DMU's reference set is efficient by
@@ -114,6 +135,7 @@ fit <- dea(sim$x, sim$y, rts = "vrs")
 summary(fit)
 head(efficiency(fit, "score"))
 head(peers(fit))
+head(peers(fit, count = TRUE))
 head(slacks(fit))
 head(fitted(fit))
 

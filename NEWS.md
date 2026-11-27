@@ -27,6 +27,11 @@ entries follow this summary, newest first.
   `summary()` reports, per DMU, both the largest difference between scores of
   the same DMU-period in different windows (`ldr`, the window's own
   instability) and the total `range`, which also includes change over time.
+* **Facet participation:** `peers(fit, count = TRUE)` tabulates how many
+  other DMUs are benchmarked against each reference DMU, which is what
+  `summary()` prints the top of. Those printed counts used to include each
+  efficient DMU referencing itself, so every one was one too high and
+  disagreed with the "enveloping no one" flag printed beside it.
 * **Robustness to a single observation:** `dea_ladder()`, the efficiency
   ladder. It drops the peer a DMU's score leans on hardest, re-scores against
   what is left, and repeats, so a score that rests on one reference unit is
@@ -53,6 +58,55 @@ entries follow this summary, newest first.
 * **`dea_cross()` no longer loses raters** to solver failures in its secondary
   program.
 * **`plot()` has a method for every result class.**
+* **`plot()` of scores draws a density reflected at the frontier.** For more
+  than one input or output it drew a histogram alone; it now overlays the
+  kernel density that `dea_boot()` resamples from, reflected at the boundary
+  so no probability leaks past 1 (or 0 for an inefficiency measure).
+* **`summary()` on a `dea_window()` result no longer merges observations
+  whose labels paste alike.** Its `ldr` grouped scores by `interaction()`
+  levels, which join with `"."`, so id `"a.b"` in period `"1"` and id `"a"` in
+  period `"b.1"` were one cell and `ldr` could exceed the DMU's total range.
+* **Named prices and directions are matched by name.** `dea_cost()`,
+  `dea_revenue()` and `dea_profit()` used price vectors and matrices in
+  position order and then overwrote their names, so `w = c(capital = 5,
+  labor = 1)` against inputs `(labor, capital)` priced labor at 5; one test
+  moved cost efficiency by 0.59. The same held for a numeric `direction` in
+  `dea_ddf()` and `dea_weak()`. Names that are the variables' names in any
+  order are now honoured, names that match only some of them are an error,
+  and unnamed input keeps the documented positional reading.
+* **`wr_linear()` with two variables means what it says.** A length-2
+  coefficient vector whose first entry was a valid index was read as the
+  (index, coefficient) shorthand `wr_bound()` used internally, so with two
+  inputs `wr_linear(v = c(1, -2))`, meaning v1 - 2 v2 <= 0, became the vacuous
+  -2 v1 <= 0; scores moved by 0.51. `wr_bound()` now stores its term as a
+  matrix row and a plain vector is always dense coefficients.
+* **`dea_reg()` refuses a fit scored against an external reference set**, as
+  `dea_boot()` and `dea_subsample()` already did. Its bias correction builds
+  the pseudo-technology from the evaluated sample, so such a fit was corrected
+  against the wrong frontier and returned estimates without a warning. `L1`
+  and `L2` are now checked: zero once gave a misleading "failed to converge"
+  or an internal error.
+* **A formula no longer drops rows with missing values.** `x = ~ x1 + x2`
+  went through `model.matrix()`'s default `na.omit`, so an `NA` in both `x`
+  and `y` gave a fit with one DMU fewer and no warning, and an `NA` in one of
+  them failed on a row count. Missing values are now refused, as they are for
+  every other way of passing data.
+* **`dea_ladder()` audits the DMU it was asked about when `dmu` is a factor.**
+  A factor was used as a row index through its level code, silently auditing
+  another DMU; it is now matched by name. A non-whole index such as `2.5` is
+  an error instead of being truncated.
+
+## Performance
+
+* **`dea(multipliers = TRUE, slack = FALSE, peers = FALSE)` solves one
+  program per DMU instead of two.** Nothing in that combination needs the
+  envelopment program: the score is the multiplier program's optimal value by
+  duality, and `sum_lambda` is the sum of its dual prices. About 1.5x faster
+  at n = 120, p = 3, q = 2, and `dea_cross()`, which uses exactly this call,
+  gains the same. The two optima agree to solver tolerance (about 1e-11), not
+  exactly, so `eff` can differ in the last digits from a fit that asks for
+  peers; a test pins the agreement. Super-efficiency and free disposal keep
+  the envelopment program.
 
 ## Documentation
 

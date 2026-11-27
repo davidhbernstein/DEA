@@ -121,6 +121,21 @@ test_that("ldr moves only the window, and range also moves the period", {
                DEA:::.window_stability(w2$table)$ldr)
 })
 
+test_that("ldr never merges two observations whose labels paste alike", {
+  ## The cells were once interaction() levels, pasted with ".": id "a.b" in
+  ## period "1" and id "a" in period "b.1" were the same cell, so ldr compared
+  ## two different observations and could exceed the DMU's total range. Every
+  ## DMU-period here is scored once, so ldr must be zero for all of them.
+  tab <- data.frame(width = 2L,
+                    id = rep(c("a.b", "a"), 3),
+                    period = rep(c("1", "b.1", "2"), each = 2),
+                    eff = c(0.9, 0.2, 0.8, 0.5, 0.7, 0.4),
+                    stringsAsFactors = FALSE)
+  st <- DEA:::.window_stability(tab)
+  expect_equal(st$ldr, c(0, 0))
+  expect_true(all(st$ldr <= st$range))
+})
+
 test_that("an unbalanced panel is an ordinary case", {
   f <- window_fixture(n = 8, t = 3)
   keep <- !(f$id == 1 & f$period == 2)

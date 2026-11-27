@@ -27,7 +27,8 @@ together, holding inputs --- the Chung-Fare-Grosskopf default. \code{"all"} also
 contracts inputs; \code{"bads"} moves only the bads. A numeric vector of length
 \eqn{p+q+b} or a matrix with one row per DMU gives an explicit direction. Every
 entry is a \strong{magnitude}: the signs are already in the program, so a
-negative entry is refused.}
+negative entry is refused. Names that are the variable names in any order are
+matched by name.}
 \item{rts}{\code{"vrs"} or \code{"crs"}. The one-sided technologies have no
 standard weak-disposability form and are not offered.}
 \item{technology}{Which variable-returns formulation. Ignored under

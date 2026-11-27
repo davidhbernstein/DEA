@@ -181,14 +181,20 @@ dea_ladder <- function(object, dmu, max_steps = NULL, threshold = 1e-8) {
 .ladder_which <- function(dmu, names) {
   if (length(dmu) != 1L)
     stop("`dmu` must name a single DMU; got ", length(dmu), ".", call. = FALSE)
+  ## A factor is a label, not a position: as.integer() would return its level
+  ## code and silently audit whichever DMU sits at that row.
+  if (is.factor(dmu)) dmu <- as.character(dmu)
   if (is.character(dmu)) {
     o <- match(dmu, names)
     if (is.na(o))
       stop("`dmu`: \"", dmu, "\" is not one of this fit's DMUs.", call. = FALSE)
     return(o)
   }
+  if (!is.numeric(dmu) || !is.finite(dmu) || dmu != round(dmu))
+    stop("`dmu` must be a DMU name or a whole-number index; got ",
+         format(dmu), ".", call. = FALSE)
   o <- as.integer(dmu)
-  if (!is.finite(o) || o < 1L || o > length(names))
+  if (o < 1L || o > length(names))
     stop("`dmu`: index ", dmu, " is outside 1:", length(names), ".",
          call. = FALSE)
   o
@@ -224,9 +230,11 @@ summary.dea_ladder <- function(object, ...) {
     cat("\nlargest single move: rung ", object$table$step[i + 1L],
         ", dropping ", object$table$dropped[i + 1L], ", ",
         format(round(d[i], 4), nsmall = 4), "\n", sep = "")
-    cat("share of the total move in that one rung: ",
-        format(round(abs(d[i]) / abs(object$eff1 - object$eff0), 3)), "\n",
-        sep = "")
+    tot <- abs(object$eff1 - object$eff0)
+    if (is.finite(tot) && tot > 0) {
+      cat("share of the total move in that one rung: ",
+          format(round(abs(d[i]) / tot, 3)), "\n", sep = "")
+    }
   }
   invisible(object)
 }

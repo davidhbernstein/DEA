@@ -233,3 +233,64 @@ test_that("the bandwidth rules all run and give a positive bandwidth", {
   expect_equal(b$bw, 0.05)
   expect_error(dea_boot(fit, B = 10, bw = -1), "positive")
 })
+
+test_that("peer counts exclude the DMU itself and agree with summary()", {
+  data("charnes1981", package = "DEA")
+  X <- as.matrix(charnes1981[, paste0("x", 1:5)])
+  Y <- as.matrix(charnes1981[, paste0("y", 1:3)])
+  f <- dea(X, Y, rts = "vrs")
+  pc <- peers(f, count = TRUE)
+  expect_named(pc, c("peer", "referenced_by", "share"))
+  expect_equal(nrow(pc), f$nref)
+  expect_false(is.unsorted(-pc$referenced_by))
+  ## By hand from the long table: rows where the peer is someone else.
+  p <- peers(f)
+  hand <- table(factor(p$peer[p$peer != p$dmu], levels = f$ref))
+  expect_equal(pc$referenced_by, as.integer(hand[pc$peer]))
+  ## The zero tail among efficient DMUs is exactly the isolated-DMU flag.
+  zero <- pc$peer[pc$referenced_by == 0L]
+  iso <- f$dmu[DEA:::.dea_self_referencing(f)]
+  expect_setequal(intersect(zero, f$dmu[f$efficient]), iso)
+  ## summary() prints the same counts, not counts inflated by one.
+  out <- capture.output(summary(f))
+  i <- grep("most frequently referenced", out)
+  printed <- as.integer(strsplit(trimws(out[i + 3L]), " +")[[1]])
+  expect_equal(printed, head(pc$referenced_by, length(printed)))
+  ## Super-efficiency has no diagonal to drop; peers = FALSE has no table.
+  s <- dea(X, Y, rts = "crs", super = TRUE)
+  expect_equal(sum(peers(s, count = TRUE)$referenced_by),
+               sum(s$lambda > 1e-8, na.rm = TRUE))
+  expect_error(peers(dea(X, Y, peers = FALSE), count = TRUE), "no peers")
+})
+
+test_that("the score density is reflected at the frontier and integrates to 1", {
+  s <- dea_sim(200, p = 2, q = 1, seed = 3)
+  trap <- function(d) sum(diff(d$x) * (head(d$y, -1) + tail(d$y, -1)) / 2)
+  ## Input orientation: scores at or below 1, no mass beyond it.
+  f <- dea(s$x, s$y, rts = "vrs")
+  d <- DEA:::.dea_density(f$eff, 1)
+  expect_true(d$reflected); expect_identical(d$side, "below")
+  expect_lte(max(d$x), 1)
+  ## Reflected mass is all inside: a plain density() would lose roughly half
+  ## the kernel of every efficient DMU past 1.
+  expect_equal(trap(d), 1, tolerance = 0.02)
+  plain <- stats::density(f$eff)
+  inside <- plain$x <= 1
+  expect_lt(sum(diff(plain$x[inside]) * head(plain$y[inside], -1)), 0.97)
+  ## Output orientation reflects on the other side; DDF at 0.
+  g <- dea(s$x, s$y, rts = "vrs", orientation = "out")
+  expect_identical(DEA:::.dea_density(g$eff, 1)$side, "above")
+  h <- dea_ddf(s$x, s$y)
+  expect_identical(DEA:::.dea_density(h$eff, DEA:::.dea_score_bound(h))$side,
+                   "above")
+  ## Super-efficiency straddles 1: no reflection.
+  k <- dea(s$x, s$y, rts = "crs", super = TRUE)
+  expect_false(DEA:::.dea_density(k$eff, 1)$reflected)
+  ## The bandwidth is dea_boot()'s, so the plot shows what it resamples.
+  b <- dea_boot(f, B = 20, seed = 1, progress = FALSE)
+  expect_equal(d$bw, b$bw)
+  ## plot() draws it and returns it.
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  out <- plot(dea(s$x, s$y, rts = "vrs"))
+  expect_equal(out$density$bw, d$bw)
+})

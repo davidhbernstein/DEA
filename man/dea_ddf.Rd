@@ -34,7 +34,9 @@ measured. One of
     evaluated set.}
 }
 Or a numeric vector of length \code{p + q} giving one fixed direction, inputs
-first; or a \code{n} by \code{p + q} matrix giving one per DMU.}
+first; or a \code{n} by \code{p + q} matrix giving one per DMU. Names (or
+column names) that are the input and output names in any order are matched by
+name; names that match only some of them are an error.}
 \item{rts}{Returns to scale, as in \code{\link{dea}}.}
 \item{peers, scaling, xref, yref, dataref}{As in \code{\link{dea}}.}
 }

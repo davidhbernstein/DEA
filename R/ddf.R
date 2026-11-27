@@ -211,11 +211,15 @@ dea_ddf <- function(x, y, data = NULL,
       stop("`direction` given as a vector must have length p + q = ", p + q,
            " (inputs then outputs); got ", length(direction), ".", call. = FALSE)
     }
-    G <- matrix(rep(direction, each = n), n, p + q)
+    G <- matrix(rep(direction, each = n), n, p + q,
+                dimnames = list(NULL, names(direction)))
   } else {
     stop("`direction` must be one of \"both\", \"in\", \"out\", \"unit\", ",
          "\"mean\", or a numeric vector/matrix.", call. = FALSE)
   }
+  if (!is.character(direction))
+    G <- .align_by_name(G, c(colnames(X), colnames(Y)), "direction",
+                        "inputs then outputs")
   if (any(!is.finite(G))) stop("`direction` contains non-finite values.", call. = FALSE)
   ## An all-zero row is fatal in general -- there is no distance to measure
   ## along -- but under "range" it is not an error at all, it is the ideal

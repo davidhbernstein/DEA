@@ -93,6 +93,24 @@ test_that("a length-p price vector is one price list shared by every DMU", {
   expect_equal(a$eff, b$eff, tolerance = 1e-12)
 })
 
+test_that("named prices are matched to the variables by name, not position", {
+  ## Names were once ignored: c(capital = 5, labor = 1) against inputs
+  ## (labor, capital) priced labor at 5, and cost efficiency moved by 0.59.
+  d <- toy(30, p = 2, q = 1, returns = 0.9)
+  x <- d$x; colnames(x) <- c("labor", "capital")
+  ref <- dea_cost(x, d$y, c(1, 5))
+  expect_equal(dea_cost(x, d$y, c(capital = 5, labor = 1))$eff, ref$eff,
+               tolerance = 1e-12)
+  W <- matrix(c(5, 1), 30, 2, byrow = TRUE,
+              dimnames = list(NULL, c("capital", "labor")))
+  expect_equal(dea_cost(x, d$y, W)$eff, ref$eff, tolerance = 1e-12)
+  ## Names matching some variables but not all are refused, not guessed at.
+  expect_error(dea_cost(x, d$y, c(capital = 5, wages = 1)), "one to one")
+  ## Names unrelated to the variables keep the positional reading.
+  expect_equal(dea_cost(x, d$y, c(a = 1, b = 5))$eff, ref$eff,
+               tolerance = 1e-12)
+})
+
 test_that("ambiguous and impossible price arguments are refused", {
   ## n == p makes "one list for everyone" and "one price each" the same shape.
   d <- toy(2, p = 2, q = 1)

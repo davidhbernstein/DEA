@@ -232,3 +232,34 @@ test_that("complementary slackness holds against a DIFFERENT-SIZED reference set
     }
   }
 })
+
+test_that("the dual-only path agrees with the envelopment program", {
+  ## With slack = FALSE and peers = FALSE, dea(multipliers = TRUE) takes the
+  ## score from the multiplier program alone and sum_lambda from its dual
+  ## prices, instead of solving both programs. The two optima agree to solver
+  ## tolerance, not exactly, so that agreement is pinned here rather than
+  ## assumed -- over every technology and both orientations.
+  d <- toy(60, p = 3, q = 2, seed = 13)
+  for (rts in c("crs", "vrs", "nirs", "ndrs")) for (o in c("in", "out")) {
+    both <- dea(d$x, d$y, rts = rts, orientation = o, slack = FALSE,
+                peers = TRUE, multipliers = TRUE)
+    dual <- dea(d$x, d$y, rts = rts, orientation = o, slack = FALSE,
+                peers = FALSE, multipliers = TRUE)
+    expect_equal(dual$eff, both$eff, tolerance = 1e-9)
+    expect_equal(dual$sum_lambda, both$sum_lambda, tolerance = 1e-8)
+    expect_equal(dual$v, both$v, tolerance = 1e-8)
+    expect_identical(dual$status, both$status)
+    expect_null(dual$lambda)
+  }
+  ## An external reference set: an infeasible envelopment program is an
+  ## unbounded dual, and `status` still reports the envelopment code, 2.
+  xr <- d$x[1:20, ] * 1.1; yr <- d$y[1:20, ]
+  env <- suppressWarnings(dea(d$x, d$y, rts = "vrs", orientation = "out",
+                              slack = FALSE, xref = xr, yref = yr))
+  dual <- suppressWarnings(dea(d$x, d$y, rts = "vrs", orientation = "out",
+                               slack = FALSE, peers = FALSE, multipliers = TRUE,
+                               xref = xr, yref = yr))
+  expect_true(any(env$status == 2L))
+  expect_identical(dual$status, env$status)
+  expect_equal(dual$eff, env$eff, tolerance = 1e-9)
+})

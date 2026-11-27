@@ -316,13 +316,18 @@ dea_profit <- function(x, y, w, r, data = NULL,
     stop("`", what, "` is required: ", if (what == "w") "input" else "output",
          " prices cannot be defaulted.", call. = FALSE)
   }
+  ## Names on a bare vector or matrix say which price is whose, and
+  ## .align_by_name() honours them. Column names from `data` (formula or
+  ## character) name price columns, not variables, and are left alone.
+  by_name <- !(inherits(arg, "formula") || is.character(arg))
   if (inherits(arg, "formula") || is.character(arg)) {
     M <- .dea_matrix(arg, data, what)
   } else if (is.data.frame(arg) || is.matrix(arg)) {
     M <- .dea_num(as.matrix(arg), what)
   } else if (is.numeric(arg) && is.vector(arg)) {
     if (length(arg) == k && (n != k || k == 1L)) {
-      M <- matrix(arg, nrow = n, ncol = k, byrow = TRUE)
+      M <- matrix(arg, nrow = n, ncol = k, byrow = TRUE,
+                  dimnames = list(NULL, names(arg)))
     } else if (length(arg) == n && k == 1L) {
       M <- matrix(arg, ncol = 1L)
     } else if (length(arg) == k && n == k) {
@@ -353,6 +358,8 @@ dea_profit <- function(x, y, w, r, data = NULL,
          "relies on the objective pushing it against its bound, which needs ",
          "strictly positive prices.", call. = FALSE)
   }
+  if (by_name) M <- .align_by_name(M, varnames, what,
+                                   if (what == "w") "inputs" else "outputs")
   colnames(M) <- varnames
   M
 }
