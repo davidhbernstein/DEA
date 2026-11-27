@@ -58,6 +58,10 @@ entries follow this summary, newest first.
 * **`dea_cross()` no longer loses raters** to solver failures in its secondary
   program.
 * **`plot()` has a method for every result class.**
+* **`plot()` of scores draws a density reflected at the frontier.** For more
+  than one input or output it drew a histogram alone; it now overlays the
+  kernel density that `dea_boot()` resamples from, reflected at the boundary
+  so no probability leaks past 1 (or 0 for an inefficiency measure).
 * **`summary()` on a `dea_window()` result no longer merges observations
   whose labels paste alike.** Its `ldr` grouped scores by `interaction()`
   levels, which join with `"."`, so id `"a.b"` in period `"1"` and id `"a"` in

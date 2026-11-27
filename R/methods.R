@@ -285,12 +285,59 @@ plot.dea <- function(x, ngrid = 400, ...) {
 
 .dea_plot_scores <- function(x, ...) {
   e <- x$eff[is.finite(x$eff)]
-  graphics::hist(e, breaks = "FD", col = "grey85", border = "white",
-                 xlab = .dea_measure_label(x),
+  bound <- .dea_score_bound(x)
+  dens <- .dea_density(e, bound)
+  h <- graphics::hist(e, breaks = "FD", plot = FALSE)
+  graphics::hist(e, breaks = "FD", freq = FALSE, col = "grey85",
+                 border = "white", xlab = .dea_measure_label(x),
+                 ylim = c(0, max(h$density, dens$y, na.rm = TRUE)),
                  main = paste0(.dea_model_label(x), ", ", toupper(x$rts)), ...)
-  graphics::abline(v = if (identical(x$model, "ddf")) 0 else 1,
-                   lwd = 2, col = "steelblue")
-  invisible(e)
+  graphics::abline(v = bound, lwd = 2, col = "steelblue")
+  if (!is.null(dens$x)) graphics::lines(dens$x, dens$y, lwd = 2)
+  invisible(list(scores = e, density = dens))
+}
+
+## Where the frontier sits on each model's scale: 0 for the two inefficiency
+## measures, 1 for every efficiency score.
+.dea_score_bound <- function(x) {
+  if (identical(x$model, "ddf")) return(0)
+  if (identical(x$model, "additive") && identical(x$measure, "unweighted"))
+    return(0)
+  1
+}
+
+## Kernel density of DEA scores, reflected at the frontier.
+##
+## A plain density() of DEA scores is wrong in a way a reader will not notice:
+## the scores have a hard boundary at the frontier and usually an atom on it, so
+## the kernel leaks probability past the boundary -- a density for theta > 1 --
+## and is biased down exactly where the mass is. Reflection fixes it: smooth the
+## 2n points {e, 2 * bound - e}, which are symmetric about the boundary, and
+## keep twice the density on the feasible side. It is the same construction,
+## and the same Silverman bandwidth, that dea_boot() smooths with, so the curve
+## drawn here is the density that procedure resamples from
+## (Benchmarking::eff.dens does the same).
+##
+## The side is read from the scores rather than assumed, because it depends on
+## the model and orientation. When they lie on both sides -- super-efficiency
+## -- there is no boundary to respect and an ordinary density() is returned.
+.dea_density <- function(e, bound, n_grid = 512L) {
+  e <- e[is.finite(e)]
+  if (length(e) < 2L || stats::sd(e) <= 0)
+    return(list(x = NULL, y = NULL, bw = NA_real_, reflected = FALSE))
+  tol <- .DEA_CONSTANTS$TOL_EFF
+  side <- if (all(e <= bound + tol)) "below" else
+          if (all(e >= bound - tol)) "above" else "none"
+  if (identical(side, "none")) {
+    d <- stats::density(e, n = n_grid)
+    return(list(x = d$x, y = d$y, bw = d$bw, reflected = FALSE))
+  }
+  refl <- c(e, 2 * bound - e)
+  bw <- suppressWarnings(.dea_bandwidth("silverman", refl, length(e)))
+  lim <- if (side == "below") c(min(e) - 3 * bw, bound) else
+                              c(bound, max(e) + 3 * bw)
+  d <- stats::density(refl, bw = bw, from = lim[1L], to = lim[2L], n = n_grid)
+  list(x = d$x, y = 2 * d$y, bw = bw, reflected = TRUE, side = side)
 }
 ## ---------------------------------------------------------------------------
 ## Extractors and methods for the multiplier form, the price models and

@@ -62,6 +62,9 @@ a data frame with columns \code{dmu}, \code{peer} and \code{lambda}, or with
 first;
 \code{slacks} and \code{fitted} return matrices with one row per DMU.
 \code{print} and \code{summary} return their argument invisibly.
+\code{plot()} returns the traced frontier invisibly when there is one input and
+one output, and otherwise a list of the \code{scores} and their
+\code{density} (with its bandwidth \code{bw}).
 }
 \details{
 \code{efficiency(object, "score")} deliberately \emph{fails} for a directional
@@ -75,7 +78,13 @@ were efficient. For a radial fit with slacks that is the radial projection with
 the remaining slack removed, so the result is a Pareto-Koopmans point.
 
 \code{plot()} draws the estimated frontier when there is one input and one
-output, and the distribution of scores otherwise. The frontier is traced by
+output, and the distribution of scores otherwise: a histogram with a kernel
+density \emph{reflected at the frontier}. Scores have a hard boundary there and
+usually an atom on it, so an ordinary \code{density()} leaks probability past
+the boundary and is biased down exactly where the mass is. The reflection and
+the Silverman bandwidth are the ones \code{\link{dea_boot}} smooths with, so
+the curve is the density that procedure resamples from. Scores on both sides
+of the boundary (super-efficiency) get an ordinary density. The frontier is traced by
 \emph{evaluating} the fitted technology on a grid of input levels rather than
 by joining up the efficient DMUs, so the same code draws it correctly under
 every returns-to-scale assumption --- including the free disposal hull's

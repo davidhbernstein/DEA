@@ -262,3 +262,35 @@ test_that("peer counts exclude the DMU itself and agree with summary()", {
                sum(s$lambda > 1e-8, na.rm = TRUE))
   expect_error(peers(dea(X, Y, peers = FALSE), count = TRUE), "no peers")
 })
+
+test_that("the score density is reflected at the frontier and integrates to 1", {
+  s <- dea_sim(200, p = 2, q = 1, seed = 3)
+  trap <- function(d) sum(diff(d$x) * (head(d$y, -1) + tail(d$y, -1)) / 2)
+  ## Input orientation: scores at or below 1, no mass beyond it.
+  f <- dea(s$x, s$y, rts = "vrs")
+  d <- DEA:::.dea_density(f$eff, 1)
+  expect_true(d$reflected); expect_identical(d$side, "below")
+  expect_lte(max(d$x), 1)
+  ## Reflected mass is all inside: a plain density() would lose roughly half
+  ## the kernel of every efficient DMU past 1.
+  expect_equal(trap(d), 1, tolerance = 0.02)
+  plain <- stats::density(f$eff)
+  inside <- plain$x <= 1
+  expect_lt(sum(diff(plain$x[inside]) * head(plain$y[inside], -1)), 0.97)
+  ## Output orientation reflects on the other side; DDF at 0.
+  g <- dea(s$x, s$y, rts = "vrs", orientation = "out")
+  expect_identical(DEA:::.dea_density(g$eff, 1)$side, "above")
+  h <- dea_ddf(s$x, s$y)
+  expect_identical(DEA:::.dea_density(h$eff, DEA:::.dea_score_bound(h))$side,
+                   "above")
+  ## Super-efficiency straddles 1: no reflection.
+  k <- dea(s$x, s$y, rts = "crs", super = TRUE)
+  expect_false(DEA:::.dea_density(k$eff, 1)$reflected)
+  ## The bandwidth is dea_boot()'s, so the plot shows what it resamples.
+  b <- dea_boot(f, B = 20, seed = 1, progress = FALSE)
+  expect_equal(d$bw, b$bw)
+  ## plot() draws it and returns it.
+  grDevices::pdf(NULL); on.exit(grDevices::dev.off())
+  out <- plot(dea(s$x, s$y, rts = "vrs"))
+  expect_equal(out$density$bw, d$bw)
+})
