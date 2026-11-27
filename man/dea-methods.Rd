@@ -24,7 +24,7 @@ efficiency(object, \dots)
 \method{efficiency}{dea}(object, type = c("natural", "score"), \dots)
 
 peers(object, \dots)
-\method{peers}{dea}(object, threshold = 1e-08, \dots)
+\method{peers}{dea}(object, threshold = 1e-08, count = FALSE, \dots)
 
 slacks(object, \dots)
 \method{slacks}{dea}(object, \dots)
@@ -47,13 +47,19 @@ multipliers(object, \dots)
 \eqn{(0, 1]} with 1 meaning efficient, which is what a table comparing models
 needs.}
 \item{threshold}{Intensity weights at or below this are not reported as peers.}
+\item{count}{For \code{peers()}: if \code{TRUE}, return one row per reference
+DMU with the number of \emph{other} DMUs whose reference set contains it, rather
+than the long table of peers.}
 \item{ngrid}{Number of grid points used to trace the frontier in
 \code{plot()}.}
 \item{\dots}{Passed to the underlying plot, or ignored.}
 }
 \value{
 \code{efficiency} and \code{nobs} return numeric vectors; \code{peers} returns
-a data frame with columns \code{dmu}, \code{peer} and \code{lambda};
+a data frame with columns \code{dmu}, \code{peer} and \code{lambda}, or with
+\code{count = TRUE} one with columns \code{peer}, \code{referenced_by} and
+\code{share} (\code{referenced_by} over the number of DMUs), most-referenced
+first;
 \code{slacks} and \code{fitted} return matrices with one row per DMU.
 \code{print} and \code{summary} return their argument invisibly.
 }
@@ -80,6 +86,12 @@ are.
 multiple optima, so \code{peers()} reports one valid benchmark set rather than
 the benchmark set. Efficiency scores are unique; the weights achieving them
 generally are not.
+
+\strong{Facet participation.} \code{peers(fit, count = TRUE)} tabulates how
+often each reference DMU appears in other DMUs' reference sets, which says
+which units are actually doing the enveloping. A DMU is not counted as its own
+referrer: every efficient DMU is its own projection, so that would add one to
+all of them and say nothing. \code{summary()} prints the top of this table.
 
 \strong{\code{summary()} names the efficient DMUs that envelop no one.} An
 efficient DMU that appears in no other DMU's reference set is efficient by
@@ -114,6 +126,7 @@ fit <- dea(sim$x, sim$y, rts = "vrs")
 summary(fit)
 head(efficiency(fit, "score"))
 head(peers(fit))
+head(peers(fit, count = TRUE))
 head(slacks(fit))
 head(fitted(fit))
 

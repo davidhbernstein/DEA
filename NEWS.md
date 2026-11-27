@@ -27,6 +27,11 @@ entries follow this summary, newest first.
   `summary()` reports, per DMU, both the largest difference between scores of
   the same DMU-period in different windows (`ldr`, the window's own
   instability) and the total `range`, which also includes change over time.
+* **Facet participation:** `peers(fit, count = TRUE)` tabulates how many
+  other DMUs are benchmarked against each reference DMU, which is what
+  `summary()` prints the top of. Those printed counts used to include each
+  efficient DMU referencing itself, so every one was one too high and
+  disagreed with the "enveloping no one" flag printed beside it.
 * **Robustness to a single observation:** `dea_ladder()`, the efficiency
   ladder. It drops the peer a DMU's score leans on hardest, re-scores against
   what is left, and repeats, so a score that rests on one reference unit is

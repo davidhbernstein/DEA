@@ -58,10 +58,12 @@ summary.dea <- function(object, ...) {
   if (!is.null(object$sum_lambda)) tb$sum_lambda <- round(object$sum_lambda, 4)
   print(utils::head(tb, 10))
   if (!is.null(object$lambda)) {
-    cnt <- colSums(object$lambda > 0, na.rm = TRUE)
-    top <- sort(cnt[cnt > 0], decreasing = TRUE)
-    cat("\nmost frequently referenced peers\n")
-    print(utils::head(top, 5))
+    pc <- .dea_peer_counts(object)
+    pc <- pc[pc$referenced_by > 0L, , drop = FALSE]
+    cat("\nmost frequently referenced peers (other DMUs benchmarked against ",
+        "each;\nall of them in peers(fit, count = TRUE))\n", sep = "")
+    print(stats::setNames(utils::head(pc$referenced_by, 5),
+                          utils::head(pc$peer, 5)))
     cat("\nPeer sets are not unique when the linear program has multiple\n",
         "optima, which is common. Treat them as one valid benchmark set,\n",
         "not as the benchmark set.\n", sep = "")
@@ -162,8 +164,41 @@ peers <- function(object, ...) UseMethod("peers")
 ## The default is .DEA_CONSTANTS$TOL_LAMBDA written out: a promise referring
 ## to an internal object cannot be documented without a codoc mismatch, and a
 ## user reading args(peers.dea) should see the number.
-peers.dea <- function(object, threshold = 1e-8, ...) {
+peers.dea <- function(object, threshold = 1e-8, count = FALSE, ...) {
+  if (isTRUE(count)) return(.dea_peer_counts(object, threshold))
   .dea_peer_table(object$lambda, object$dmu, object$ref, threshold, "dea()")
+}
+
+## Facet participation: for each reference DMU, how many OTHER evaluated DMUs
+## carry weight on it. Chapter 3 section 5 and chapter 21 section 5 recommend
+## tabulating it, because it says which units are actually doing the
+## enveloping.
+##
+## THE DIAGONAL IS EXCLUDED on a self-referenced, non-super fit, for the reason
+## .dea_self_referencing() gives: an efficient DMU is its own projection, so
+## counting itself would add one to every efficient unit and say nothing.
+## summary() once printed exactly that inflated count beside the isolated-DMU
+## flag, which excluded it -- the two halves of one printout disagreed by one.
+## With an external reference set the reference DMUs are not evaluated, and
+## under super-efficiency each DMU is already out of its own set, so there is
+## no diagonal to drop.
+.dea_peer_counts <- function(object, threshold = 1e-8) {
+  L <- object$lambda
+  if (is.null(L)) {
+    stop("This fit has no peers: the lambda matrix was not kept. Refit dea() ",
+         "with peers = TRUE.", call. = FALSE)
+  }
+  M <- L > threshold
+  M[is.na(M)] <- FALSE
+  if (isTRUE(object$self_ref) && !isTRUE(object$super)) {
+    d <- seq_len(min(dim(M)))
+    M[cbind(d, d)] <- FALSE
+  }
+  cnt <- colSums(M)
+  o <- order(-cnt, seq_along(cnt))
+  data.frame(peer = object$ref[o], referenced_by = as.integer(cnt[o]),
+             share = cnt[o] / object$n, row.names = NULL,
+             stringsAsFactors = FALSE)
 }
 
 slacks <- function(object, ...) UseMethod("slacks")

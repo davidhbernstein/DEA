@@ -233,3 +233,32 @@ test_that("the bandwidth rules all run and give a positive bandwidth", {
   expect_equal(b$bw, 0.05)
   expect_error(dea_boot(fit, B = 10, bw = -1), "positive")
 })
+
+test_that("peer counts exclude the DMU itself and agree with summary()", {
+  data("charnes1981", package = "DEA")
+  X <- as.matrix(charnes1981[, paste0("x", 1:5)])
+  Y <- as.matrix(charnes1981[, paste0("y", 1:3)])
+  f <- dea(X, Y, rts = "vrs")
+  pc <- peers(f, count = TRUE)
+  expect_named(pc, c("peer", "referenced_by", "share"))
+  expect_equal(nrow(pc), f$nref)
+  expect_false(is.unsorted(-pc$referenced_by))
+  ## By hand from the long table: rows where the peer is someone else.
+  p <- peers(f)
+  hand <- table(factor(p$peer[p$peer != p$dmu], levels = f$ref))
+  expect_equal(pc$referenced_by, as.integer(hand[pc$peer]))
+  ## The zero tail among efficient DMUs is exactly the isolated-DMU flag.
+  zero <- pc$peer[pc$referenced_by == 0L]
+  iso <- f$dmu[DEA:::.dea_self_referencing(f)]
+  expect_setequal(intersect(zero, f$dmu[f$efficient]), iso)
+  ## summary() prints the same counts, not counts inflated by one.
+  out <- capture.output(summary(f))
+  i <- grep("most frequently referenced", out)
+  printed <- as.integer(strsplit(trimws(out[i + 3L]), " +")[[1]])
+  expect_equal(printed, head(pc$referenced_by, length(printed)))
+  ## Super-efficiency has no diagonal to drop; peers = FALSE has no table.
+  s <- dea(X, Y, rts = "crs", super = TRUE)
+  expect_equal(sum(peers(s, count = TRUE)$referenced_by),
+               sum(s$lambda > 1e-8, na.rm = TRUE))
+  expect_error(peers(dea(X, Y, peers = FALSE), count = TRUE), "no peers")
+})
