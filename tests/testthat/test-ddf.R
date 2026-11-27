@@ -204,3 +204,16 @@ test_that("dea_profit accepts the range direction and reports why it cannot at t
                                 direction = "range", rts = "vrs")),
     "zero or negative")
 })
+
+test_that("a named direction is matched to the variables by name", {
+  ## Names were once ignored and the vector read as inputs-then-outputs, so
+  ## naming the entries in another order silently changed the direction.
+  d <- toy(30, p = 2, q = 1, returns = 0.9)
+  x <- d$x; colnames(x) <- c("labor", "capital")
+  y <- d$y; colnames(y) <- "out"
+  ref <- dea_ddf(x, y, direction = c(1, 2, 3))
+  alt <- dea_ddf(x, y, direction = c(out = 3, capital = 2, labor = 1))
+  expect_equal(alt$eff, ref$eff, tolerance = 1e-10)
+  expect_error(dea_ddf(x, y, direction = c(out = 3, capital = 2, wage = 1)),
+               "one to one")
+})

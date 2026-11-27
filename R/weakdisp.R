@@ -209,11 +209,15 @@ dea_weak <- function(x, y, bad, data = NULL,
       stop("`direction` as a vector must have length p + q + b = ", p + q + nb,
            "; got ", length(direction), ".", call. = FALSE)
     }
-    G <- matrix(rep(direction, each = n), n, p + q + nb)
+    G <- matrix(rep(direction, each = n), n, p + q + nb,
+                dimnames = list(NULL, names(direction)))
   } else {
     stop("`direction` must be \"goods_bads\", \"all\", \"bads\", or numeric.",
          call. = FALSE)
   }
+  if (!is.character(direction))
+    G <- .align_by_name(G, c(colnames(X), colnames(Y), colnames(B)),
+                        "direction", "inputs, good outputs and bads")
   if (any(!is.finite(G))) stop("`direction` contains non-finite values.", call. = FALSE)
   if (any(G < 0)) {
     stop("`direction` has negative entries. Every component here is a ",

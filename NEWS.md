@@ -57,6 +57,19 @@ entries follow this summary, newest first.
   whose labels paste alike.** Its `ldr` grouped scores by `interaction()`
   levels, which join with `"."`, so id `"a.b"` in period `"1"` and id `"a"` in
   period `"b.1"` were one cell and `ldr` could exceed the DMU's total range.
+* **Named prices and directions are matched by name.** `dea_cost()`,
+  `dea_revenue()` and `dea_profit()` used price vectors and matrices in
+  position order and then overwrote their names, so `w = c(capital = 5,
+  labor = 1)` against inputs `(labor, capital)` priced labor at 5; one test
+  moved cost efficiency by 0.59. The same held for a numeric `direction` in
+  `dea_ddf()` and `dea_weak()`. Names that are the variables' names in any
+  order are now honoured, names that match only some of them are an error,
+  and unnamed input keeps the documented positional reading.
+* **A formula no longer drops rows with missing values.** `x = ~ x1 + x2`
+  went through `model.matrix()`'s default `na.omit`, so an `NA` in both `x`
+  and `y` gave a fit with one DMU fewer and no warning, and an `NA` in one of
+  them failed on a row count. Missing values are now refused, as they are for
+  every other way of passing data.
 * **`dea_ladder()` audits the DMU it was asked about when `dmu` is a factor.**
   A factor was used as a row index through its level code, silently auditing
   another DMU; it is now matched by name. A non-whole index such as `2.5` is

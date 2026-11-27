@@ -43,7 +43,10 @@ price list faced by every DMU, or an \eqn{n \times p} matrix or data frame with
 one row per DMU, or -- with \code{data} -- column names or a one-sided formula.
 All prices must be strictly positive. A bare vector is read as a shared price
 list, \emph{not} as one observation per DMU; when \eqn{n = p} makes the two
-readings indistinguishable, the call is refused rather than guessed.}
+readings indistinguishable, the call is refused rather than guessed. A named
+vector, or a matrix with column names, whose names are the input names in any
+order is matched to the inputs by name; names that match only some of them are
+an error, and unrelated names (or none) mean position order.}
 \item{r}{Output prices, in the same forms, with \eqn{q} in place of \eqn{p}.}
 \item{rts}{Returns to scale, as in \code{\link{dea}}. \code{dea_profit()}
 accepts only \code{"vrs"} and \code{"nirs"}; see \strong{Details}.}
